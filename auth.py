@@ -258,7 +258,54 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
 
             # DEBUG: Trace authentication status
             st.write(f"DEBUG: Pre-login status: {st.session_state.get('authentication_status')}")
-            # st.write(f"DEBUG: Cookie: {authenticator.cookie_handler.get_cookie()}") # Only if available in this version
+            
+            # DEBUG: Inspect RAW Headers (The Truth)
+            try:
+                from streamlit.web.server.websocket_headers import _get_websocket_headers
+                headers = _get_websocket_headers()
+                if headers:
+                    cookie_header = headers.get("Cookie")
+                    if cookie_header:
+                        st.write(f"DEBUG: RAW 'Cookie' header received: {cookie_header[:20]}... (Len: {len(cookie_header)})")
+                        if "ingles_pro_session_v2" in cookie_header:
+                            st.write("DEBUG: ✅ 'ingles_pro_session_v2' found in raw headers!")
+                        else:
+                            st.write("DEBUG: ❌ 'ingles_pro_session_v2' NOT found in raw headers.")
+                    else:
+                        st.write("DEBUG: ❌ No 'Cookie' header received at all.")
+                else:
+                    st.write("DEBUG: Could not read websocket headers.")
+            except Exception as e:
+                st.write(f"DEBUG: Failed to read headers: {e}")
+                
+            # DEBUG: Inspect secrets loading (masked)
+            
+            # DEBUG: Inspect secrets loading (masked)
+            try:
+                secret_loaded = st.secrets.get("SECRET_KEY", None)
+                if secret_loaded:
+                    masked_secret = str(secret_loaded)[:4] + "..."
+                    st.write(f"DEBUG: SECRET_KEY loaded from secrets.toml: YES ({masked_secret})")
+                else:
+                    st.write("DEBUG: SECRET_KEY loaded from secrets.toml: NO (Using config backup)")
+            except Exception as e:
+                st.write(f"DEBUG: Failed to read secrets: {e}")
+
+            # DEBUG: Inspect Cookies (Streamlit 1.30+ feature if available)
+            try:
+                # Tentativa de ler cookies diretamente dos headers/contexto
+                # Nota: st.context.cookies está disponível apenas em versões recentes
+                if hasattr(st, "context") and hasattr(st.context, "cookies"):
+                    all_cookies = st.context.cookies
+                    st.write(f"DEBUG: Browser Cookies Found: {list(all_cookies.keys())}")
+                    if "ingles_pro_session_v2" in all_cookies:
+                         st.write(f"DEBUG: Session Cookie Value (masked): {str(all_cookies['ingles_pro_session_v2'])[:10]}...")
+                    else:
+                         st.write("DEBUG: Session Cookie NOT found in browser request.")
+                else:
+                     st.write("DEBUG: st.context.cookies not available in this Streamlit version.")
+            except Exception as e:
+                st.write(f"DEBUG: Error inspecting cookies: {e}")
             
             if st.session_state.get("authentication_status") is None:
                  st.write("DEBUG: Status is None. Form should be visible.")
