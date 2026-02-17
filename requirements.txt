@@ -6,4 +6,5 @@ vosk
 pandas
 bcrypt
 requests
+libsql-experimental
 pysqlite3-binary

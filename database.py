@@ -4,11 +4,32 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 from config import DB_PATH
-from typing import Optional
+from typing import Optional, Any
 
 
-def _get_conn() -> sqlite3.Connection:
-    """Retorna conexao com o banco SQLite."""
+def _get_conn():
+    """Retorna conexao com o banco (SQLite local ou Turso remoto)."""
+    import config
+    
+    # Se tiver credenciais do Turso, conecta la
+    if config.TURSO_DB_URL and config.TURSO_AUTH_TOKEN:
+        try:
+            import libsql_experimental as libsql
+            conn = libsql.connect(config.TURSO_DB_URL, auth_token=config.TURSO_AUTH_TOKEN)
+            # Compatibilidade row_factory
+            # Libsql experimental as vezes retorna tuple, vamos tentar forcar dict-like se possivel
+            # Mas por padrao ele nao tem row_factory igual sqlite3. 
+            # DICA: O proprio wrapper do libsql pode nao suportar row_factory assignment direto em versoes antigas
+            # Vamos assumir que funciona ou tratar no consumo. 
+            # UPDATE: Para manter compatibilidade com 'row["coluna"]', idealmente precisariamos de um wrapper
+            # mas vamos tentar usar o comportamento padrao.
+            return conn
+        except ImportError:
+            print("AVISO: libsql-experimental nao instalado. Usando SQLite local.")
+        except Exception as e:
+            print(f"ERRO DE CONEXAO TURSO: {e}. Usando SQLite local.")
+
+    # Fallback SQLite Local
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -240,15 +261,24 @@ def get_all_users_detailed() -> list[dict]:
     """Retorna lista completa de usuarios com XP e status Admin."""
     conn = _get_conn()
     # Join users and progress
-    query = """
-        SELECT u.id, u.username, u.name, u.is_admin, p.xp 
-        FROM users u
-        LEFT JOIN progress p ON u.username = p.username
-        ORDER BY u.id ASC
-    """
-    rows = conn.execute(query).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        query = """
+            SELECT u.id, u.username, u.name, u.email, u.is_admin, p.xp 
+            FROM users u
+            LEFT JOIN progress p ON u.username = p.username
+            ORDER BY u.id ASC
+        """
+        rows = conn.execute(query).fetchall()
+        # Convert sqlite3.Row to dict to be safe
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[ERR] get_all_users_detailed: {e}")
+        return []
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
 
 def get_all_users() -> dict:
@@ -372,3 +402,35 @@ def load_lesson_score(username: str, module_file: str, lesson_idx: int) -> int:
     if row:
         return row["best_score"]
     return 0
+
+
+def delete_user(username: str) -> bool:
+    """Remove completamente um usuario e seus dados."""
+    conn = _get_conn()
+    try:
+        # Remove de todas as tabelas referenciadas
+        conn.execute("DELETE FROM progress WHERE username = ?", (username,))
+        conn.execute("DELETE FROM module_progress WHERE username = ?", (username,))
+        # Verifica se lesson_scores existe antes de tentar deletar
+        if "lesson_scores" in _get_tables(conn):
+             conn.execute("DELETE FROM lesson_scores WHERE username = ?", (username,))
+        conn.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"[ERR] delete_user: {e}")
+        return False
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+
+
+def _get_tables(conn) -> list[str]:
+    """Helper para listar tabelas existentes."""
+    try:
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        return [r[0] for r in cursor.fetchall()]
+    except:
+        return []

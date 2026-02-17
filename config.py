@@ -66,6 +66,10 @@ ASSETS_DIR: str = os.path.normpath(_assets_raw if os.path.isabs(_assets_raw) els
 _db_raw: str = _get("DB_PATH", os.path.join(DATA_DIR, "ingles_pro.db"))
 DB_PATH: str = os.path.normpath(_db_raw if os.path.isabs(_db_raw) else os.path.join(BASE_DIR, _db_raw))
 
+# -- Turso (Banco de Dados Externo) --
+TURSO_DB_URL: str = _get("TURSO_DB_URL", "")
+TURSO_AUTH_TOKEN: str = _get("TURSO_AUTH_TOKEN", "")
+
 # -- Seguranca --
 SECRET_KEY: str = _get("SECRET_KEY", "CHANGE_ME_IN_PRODUCTION")
 

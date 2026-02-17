@@ -31,24 +31,26 @@ def _render_user_management(current_admin_user: str):
         return
 
     # Table Header
-    c1, c2, c3, c4, c5 = st.columns([1, 2, 2, 1, 2])
+    c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 2, 2, 1, 2])
     c1.markdown("**ID**")
     c2.markdown("**User**")
     c3.markdown("**Nome**")
-    c4.markdown("**XP**")
-    c5.markdown("**Ações**")
+    c4.markdown("**Email**")
+    c5.markdown("**XP**")
+    c6.markdown("**Ações**")
     st.divider()
 
     for u in users:
-        c1, c2, c3, c4, c5 = st.columns([1, 2, 2, 1, 2])
+        c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 2, 2, 1, 2])
         is_self = (u['username'] == current_admin_user)
         
         c1.write(f"#{u['id']}")
         c2.write(f"**{u['username']}**")
         c3.write(u['name'])
+        c4.write(u.get('email', '-') or '-')
         
         # XP Edit
-        with c4:
+        with c5:
              # Unique key per user
              current_xp = u['xp'] if u['xp'] is not None else 0
              new_xp = st.number_input("XP", value=current_xp, key=f"xp_{u['username']}", label_visibility="collapsed")
@@ -59,7 +61,7 @@ def _render_user_management(current_admin_user: str):
                      st.rerun()
 
         # Actions
-        with c5:
+        with c6:
             # is_admin toggle
             is_adm = bool(u['is_admin'])
             if st.checkbox("Admin", value=is_adm, key=f"is_adm_{u['username']}", disabled=is_self):
@@ -73,11 +75,29 @@ def _render_user_management(current_admin_user: str):
                     st.toast(f"{u['username']} removido de Admin.")
                     st.rerun()
 
-            # Password Reset Modal Trigger
-            if st.button("🔑 Senha", key=f"pwd_{u['username']}"):
+            # Password Reset
+            if st.button("🔑", key=f"pwd_{u['username']}", help="Resetar Senha"):
                 _reset_password_dialog(u['username'])
+            
+            # Delete User
+            if not is_self:
+                if st.button("🗑️", key=f"del_{u['username']}", help="Excluir Usuário"):
+                    _delete_user_dialog(u['username'])
 
     st.divider()
+
+
+@st.dialog("Excluir Usuário")
+def _delete_user_dialog(target_username: str):
+    st.error(f"Tem certeza que deseja excluir **{target_username}**?")
+    st.warning("Essa ação não pode ser desfeita. Todo o progresso será perdido.")
+    
+    if st.button("Sim, excluir permanentemente"):
+        if database.delete_user(target_username):
+            st.success(f"Usuário {target_username} excluído.")
+            st.rerun()
+        else:
+            st.error("Erro ao excluir usuário.")
 
 
 @st.dialog("Resetar Senha")
