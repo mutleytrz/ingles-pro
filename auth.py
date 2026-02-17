@@ -187,6 +187,54 @@ def render_register():
                 st.error(f"❌ Usuário '{new_user}' já existe.")
 
 
+import hmac
+import hashlib
+import json
+import base64
+import time
+
+# ... (imports existing) ...
+
+def _get_secret_key():
+    """Retorna chave secreta para assinatura."""
+    try:
+        return st.secrets.get("SECRET_KEY", config.SECRET_KEY)
+    except:
+        return config.SECRET_KEY
+
+def create_session_token(username: str) -> str:
+    """Cria um token assinado para a URL."""
+    payload = {
+        "u": username,
+        "exp": time.time() + (30 * 24 * 3600)  # 30 dias
+    }
+    payload_str = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+    signature = hmac.new(
+        _get_secret_key().encode(),
+        payload_str.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    return f"{payload_str}.{signature}"
+
+def validate_session_token(token: str) -> Optional[str]:
+    """Valida o token da URL e retorna o username se valido."""
+    try:
+        payload_str, signature = token.split(".")
+        # Recalcula assinatura
+        expected_sig = hmac.new(
+            _get_secret_key().encode(),
+            payload_str.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if hmac.compare_digest(expected_sig, signature):
+            payload = json.loads(base64.urlsafe_b64decode(payload_str).decode())
+            if payload["exp"] > time.time():
+                return payload["u"]
+    except Exception:
+        pass
+    return None
+
 def render_login() -> Optional[str]:
     """
     Renderiza a tela de login + cadastro com fluxo de email.
@@ -198,6 +246,24 @@ def render_login() -> Optional[str]:
         st.session_state["_authenticator_instance"] = _build_authenticator()
     
     authenticator = st.session_state["_authenticator_instance"]
+
+    # ------------------------------------------------------------------
+    # URL SESSION CHECK (NUCLEAR OPTION ☢️)
+    # ------------------------------------------------------------------
+    # Se nao esta logado, checa se tem token na URL
+    if st.session_state.get("authentication_status") is not True:
+        query_params = st.query_params
+        if "session" in query_params:
+            token = query_params["session"]
+            valid_user = validate_session_token(token)
+            if valid_user:
+                # Login automatico via URL
+                st.session_state["authentication_status"] = True
+                st.session_state["username"] = valid_user
+                st.session_state["name"] = valid_user # Pode buscar nome real no DB se quiser
+                st.session_state["logout"] = False
+                st.rerun()
+    # ------------------------------------------------------------------
 
     # 1. Se estiver pendente de verificação, mostra tela de código
     pending_user = st.session_state.get("pending_verification_user")
@@ -275,46 +341,11 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                     st.session_state["_authenticator"] = authenticator
                     
                     # ------------------------------------------------------------------
-                    # CRITICAL FIX: MANUAL COOKIE SETTER (ROBUST MODE)
+                    # NUCLEAR URL PERSISTENCE ☢️
                     # ------------------------------------------------------------------
-                    # Força a gravação do cookie via JS com atributos corretos para iframes/cloud
-                    try:
-                        token = None
-                        if hasattr(authenticator, 'cookie_handler'):
-                             token = authenticator.cookie_handler.token
-                        elif hasattr(authenticator, 'token'):
-                             token = authenticator.token
-                        
-                        if token:
-                            # Define o cookie via JS com SameSite=None; Secure (Obrigatório para iframes/Cloud)
-                            # E também define a versão legacy (sem SameSite) para compatibilidade
-                            js_cookie = f"""
-                            <script>
-                                function setCookie(name, value, days) {{
-                                    var expires = "";
-                                    if (days) {{
-                                        var date = new Date();
-                                        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-                                        expires = "; expires=" + date.toUTCString();
-                                    }}
-                                    // Cookie Moderno (Partitioned / Cross-site)
-                                    document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=None; Secure";
-                                    // Backup Legacy
-                                    document.cookie = name + "_legacy=" + (value || "") + expires + "; path=/; Secure";
-                                    console.log("✅ EnglishPro: Auth Cookies set successfully!");
-                                }}
-                                setCookie("{authenticator.cookie_name}", "{token}", {authenticator.cookie_expiry_days});
-                            </script>
-                            """
-                            # Injeta o JS invisivelmente
-                            st.markdown(js_cookie, unsafe_allow_html=True)
-                            
-                            # Pequeno delay para garantir que o navegador processe antes de qualquer reload
-                            # time.sleep(0.5) 
-                        else:
-                            print("DEBUG: Could not find auth token for manual cookie set.")
-                    except Exception as e:
-                        print(f"DEBUG: Manual cookie set failed: {e}")
+                    # Gera token e coloca na URL
+                    token = create_session_token(username_logged)
+                    st.query_params["session"] = token
                     # ------------------------------------------------------------------
 
                     return username_logged
@@ -348,6 +379,11 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                         except Exception:
                             pass
                         st.session_state["_authenticator"] = authenticator
+                        
+                        # NUCLEAR URL PERSISTENCE (fallback path)
+                        token = create_session_token(username_logged)
+                        st.query_params["session"] = token
+                        
                         return username_logged
 
             elif st.session_state.get("authentication_status") is False:
@@ -399,11 +435,14 @@ def render_logout(location="sidebar"):
                 if st.button("Logout de Emergência"):
                     for key in list(st.session_state.keys()):
                         del st.session_state[key]
+                    st.query_params.clear() # Limpa URL
                     st.rerun()
     else:
         if authenticator is not None:
             try:
-                authenticator.logout("ENCERRAR SESSÃO", location=location)
+                if authenticator.logout("ENCERRAR SESSÃO", location=location):
+                    # Se clicou em sair, limpa URL tambem
+                    st.query_params.clear()
             except Exception:
                 pass
 
