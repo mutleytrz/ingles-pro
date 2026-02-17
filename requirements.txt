@@ -1,0 +1,8 @@
+streamlit>=1.30
+streamlit-authenticator==0.4.2
+streamlit-mic-recorder
+gtts
+vosk
+pandas
+bcrypt
+requests

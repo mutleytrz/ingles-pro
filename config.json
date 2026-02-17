@@ -1,0 +1,14 @@
+{
+    "DATA_DIR": ".",
+    "MODEL_DIR": "model",
+    "IMAGES_DIR": "imagens",
+    "AUDIOS_DIR": "audios_local",
+    "ASSETS_DIR": "assets",
+    "DB_PATH": "ingles_pro.db",
+    "SECRET_KEY": "CHANGE_ME_IN_PRODUCTION",
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_PORT": 587,
+    "SMTP_USER": "seu_email@gmail.com",
+    "SMTP_PASS": "sua_senha_de_app",
+    "SMTP_FROM_NAME": "English Pro AI"
+}

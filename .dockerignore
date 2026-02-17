@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+venv
+.env
+progresso.json
+*.mp3
+*.wav
+ingles_pro.db
+.dockerignore
+Dockerfile
+README.md

@@ -1,0 +1,301 @@
+from __future__ import annotations
+# auth.py — Camada de autenticação (email + senha)
+
+import streamlit as st
+import streamlit_authenticator as stauth
+import database
+import config
+import email_service
+import random
+from typing import Optional
+
+
+def _build_authenticator():
+    """Constrói o objeto Authenticate a partir dos usuários no banco."""
+    creds = database.get_all_users()
+    if not creds["usernames"]:
+        return None
+
+    authenticator = stauth.Authenticate(
+        credentials={"usernames": creds["usernames"]},
+        cookie_name="ingles_pro_cookie",
+        cookie_key=config.SECRET_KEY,
+        cookie_expiry_days=30,
+        auto_hash=False,  # já salvamos hashed no banco
+    )
+    return authenticator
+
+
+def _generate_code() -> str:
+    """Gera codigo de 6 digitos."""
+    return str(random.randint(100000, 999999))
+
+
+def render_email_verification(username: str):
+    """Tela de verificacao de codigo."""
+    
+    # MODO DEV: Se nao tem SMTP, ajuda o usuario mostrando o codigo
+    dev_message = ""
+    if not config.SMTP_HOST or not config.SMTP_USER:
+        # Pega o codigo do banco rapidinho
+        try:
+            conn = database._get_conn()
+            row = conn.execute("SELECT verification_code FROM users WHERE username=?", (username,)).fetchone()
+            if row:
+                dev_message = f"<div style='background:#fef3c7; color:#d97706; padding:10px; border-radius:8px; margin-bottom:15px; text-align:center; font-weight:bold;'>🔧 MODO DEV (Sem Email): Seu código é {row['verification_code']}</div>"
+            conn.close()
+        except:
+            pass
+
+    st.markdown(f"""
+    <div style='text-align:center; animation:fadeInUp 0.5s ease-out; background:rgba(139,92,246,0.05); padding:30px; border-radius:20px; border:1px solid rgba(139,92,246,0.2);'>
+        <h2 style='color:#fff;'>📧 Verifique seu Email</h2>
+        <p style='color:#a78bfa;'>Enviamos um código de 6 dígitos para o email cadastrado em <strong>{username}</strong>.</p>
+        {dev_message}
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("verify_form"):
+        code_input = st.text_input("Código de Verificação", max_chars=6, placeholder="000000", key="ver_code").strip()
+        submit = st.form_submit_button("✅ CONFIRMAR CÓDIGO", use_container_width=True)
+
+    if submit:
+        if database.verify_email_code(username, code_input):
+            st.success("✅ Email verificado com sucesso! Você já pode entrar.")
+            if "pending_verification_user" in st.session_state:
+                del st.session_state["pending_verification_user"]
+            st.balloons()
+            st.rerun()
+        else:
+            st.error("❌ Código inválido ou expirado.")
+    
+    if st.button("⬅ Voltar ao Login"):
+        if "pending_verification_user" in st.session_state:
+             del st.session_state["pending_verification_user"]
+        st.rerun()
+
+
+def render_register():
+    """Formulário de cadastro de novo usuário (Premium Look)."""
+    st.markdown("""
+<div style='text-align:center; margin-bottom:20px; animation:fadeInUp 0.5s ease-out;'>
+<div style='background:rgba(139,92,246,0.08); display:inline-block; padding:14px 28px; border-radius:16px; border:1px solid rgba(139,92,246,0.15);'>
+<h3 style='margin:0; font-size:18px; color:#c4b5fd !important;'>📝 Criar Nova Conta</h3>
+</div>
+<p style='color:#94a3b8; font-size:14px; margin-top:8px;'>Informe um email válido para ativar sua conta.</p>
+</div>
+""", unsafe_allow_html=True)
+
+    with st.form("register_form"):
+        st.markdown("<div style='display:flex; gap:20px;'>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            new_user = st.text_input("👤 Usuário", key="reg_user", placeholder="ex: aluno123")
+            new_email = st.text_input("📧 Email", key="reg_email", placeholder="seu@email.com")
+            new_pass = st.text_input("🔑 Senha", type="password", key="reg_pass", placeholder="••••")
+        with c2:
+            new_name = st.text_input("📛 Nome", key="reg_name", placeholder="Seu nome")
+            st.write("") # Spacer
+            new_pass2 = st.text_input("🔑 Confirmar", type="password", key="reg_pass2", placeholder="••••")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        submitted = st.form_submit_button("🚀 CRIAR CONTA", use_container_width=True)
+
+    if submitted:
+        if not new_user or not new_name or not new_pass or not new_email:
+            st.error("⚠️ Preencha todos os campos.")
+            return
+        if new_pass != new_pass2:
+            st.error("⚠️ As senhas não coincidem.")
+            return
+        if len(new_pass) < 4:
+            st.error("⚠️ A senha deve ter pelo menos 4 caracteres.")
+            return
+
+        hashed = stauth.Hasher().hash(new_pass)
+        verification_code = _generate_code()
+        
+        ok = database.create_user_with_email(new_user, new_name, hashed, new_email, verification_code)
+        if ok:
+            # Invalida cache do authenticator
+            if "_authenticator_instance" in st.session_state:
+                del st.session_state["_authenticator_instance"]
+                
+            # Tenta enviar email
+            sent = email_service.send_verification_email(new_email, verification_code)
+            
+            if sent:
+                st.session_state["pending_verification_user"] = new_user
+                
+                # UX MELHORADA: Se estiver em MODO DEV (sem SMTP), mostra o codigo na tela
+                if not config.SMTP_HOST or not config.SMTP_USER:
+                    st.info(f"🔧 MODO DEV (Sem Email): Seu código é **{verification_code}**")
+                else:
+                    st.success(f"✅ Conta criada! Enviamos um código para {new_email}.")
+                
+                # Pequeno delay para ler antes de dar rerun? 
+                # Nao, o rerun limpa a tela. O st.info vai sumir.
+                # Precisamos persistir a mensagem ou mostrar na TELA DE VERIFICACAO.
+                st.rerun()
+            else:
+                st.warning("⚠️ Conta criada, mas falha ao enviar email. Contate o admin ou configure o SMTP.")
+                st.success("Conta criada.")
+        else:
+            st.error(f"❌ Usuário '{new_user}' já existe.")
+
+
+def render_login() -> Optional[str]:
+    """
+    Renderiza a tela de login + cadastro com fluxo de email.
+    """
+    # -----------------------------------------------------------
+    # FIX: Preventing DuplicateElementKey (CookieManager conflict)
+    # -----------------------------------------------------------
+    if "_authenticator_instance" not in st.session_state:
+        st.session_state["_authenticator_instance"] = _build_authenticator()
+    
+    authenticator = st.session_state["_authenticator_instance"]
+
+    # 1. Se estiver pendente de verificação, mostra tela de código
+    pending_user = st.session_state.get("pending_verification_user")
+    if pending_user:
+        # Header simplificado
+        st.markdown("<div style='text-align:center; margin:40px 0;'><h1>🚀 ENGLISH PRO</h1></div>", unsafe_allow_html=True)
+        
+        _sp1, c_main, _sp2 = st.columns([1, 2, 1])
+        with c_main:
+            render_email_verification(pending_user)
+        return None
+
+    # 2. Tela Normal de Login
+    # 2. Tela Normal de Login - HERO HEADER REWORK
+    st.markdown("""
+<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding-top:60px; margin-bottom:50px; animation:fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);">
+<div class="sys-badge" style="border-color:rgba(6,182,212,0.5); background:rgba(6,182,212,0.1); color:#22d3ee; margin-bottom:20px; box-shadow:0 0 15px rgba(6,182,212,0.2);">
+<span style="animation:pulse 2s infinite;">●</span> SISTEMA V2.0: ONLINE
+</div>
+<div style="font-size:72px; font-weight:900; letter-spacing:-2px; line-height:1.0; margin-bottom:15px; font-family:'Outfit',sans-serif; text-align:center; filter: drop-shadow(0 0 20px rgba(139,92,246,0.2));">
+<span style="color:#fff;">ENGLISH</span>
+<span style="background:linear-gradient(135deg, #8b5cf6 0%, #06b6d4 50%, #f472b6 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">PRO</span>
+<span style="font-size:40px; vertical-align:top; margin-left:5px;">🚀</span>
+</div>
+<div style="background:linear-gradient(90deg, transparent, rgba(139,92,246,0.1), transparent); height:1px; width:200px; margin:10px 0 20px;"></div>
+<div style="text-align:center; max-width:700px;">
+<h2 style="font-size:26px; color:#e2e8f0; margin-bottom:10px; font-weight:700;">
+A Revolução da sua Fluência.
+</h2>
+<p style="color:#94a3b8; font-size:18px; line-height:1.6; font-family:'Outfit',sans-serif; font-weight:400;">
+Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimento de voz em tempo real e metodologia imersiva.
+</p>
+</div>
+<div style="margin-top:25px; color:#64748b; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:10px;">
+<span style="width:20px; height:1px; background:#64748b;"></span>
+ÁREA EXCLUSIVA DE MEMBROS
+<span style="width:20px; height:1px; background:#64748b;"></span>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+    _sp1, c_main, _sp2 = st.columns([1.5, 2, 1.5])
+    
+    with c_main:
+        if authenticator is not None:
+            try:
+                authenticator.login(
+                    location="main",
+                    fields={
+                        "Form name": "🔐 Acessar Plataforma",
+                        "Username": "Usuário",
+                        "Password": "Senha",
+                        "Login": "ENTRAR NO SISTEMA",
+                    },
+                )
+            except Exception:
+                authenticator.login("main")
+
+            # ------------------------------------------------------------------
+            # CRITICAL FIX: FORCE SESSION CLEANUP IF NOT AUTHENTICATED
+            # ------------------------------------------------------------------
+            # Se não logou (está na tela de login), GARANTIR que não sobrou lixo de sessões anteriores
+            if st.session_state.get("authentication_status") is not True:
+                keys_to_nuke = ['xp', 'indice', 'porc_atual', 'tentativa', 'pagina', 'arquivo_atual', '_progresso_carregado']
+                for k in keys_to_nuke:
+                    if k in st.session_state:
+                         del st.session_state[k]
+            # ------------------------------------------------------------------
+
+            if st.session_state.get("authentication_status") is True:
+                # Checa se email verificado
+                username_logged = st.session_state.get("username")
+                
+                if database.is_email_verified(username_logged):
+                    st.session_state["_authenticator"] = authenticator
+                    return username_logged
+                else:
+                    # Nao verificado -> Logout forcado e manda pra tela de verificacao
+                    authenticator.logout("main") # limpa cookie
+                    st.session_state["pending_verification_user"] = username_logged
+                    st.rerun()
+
+            elif st.session_state.get("authentication_status") is False:
+                st.error("❌ Usuário ou senha incorretos.")
+        else:
+            st.info("👋 Bem-vindo! Crie o primeiro usuário admin abaixo.")
+
+        st.markdown("<div class='divider-glow'></div>", unsafe_allow_html=True)
+        render_register()
+    
+    return None
+
+
+def render_logout(location="sidebar"):
+    """Botão de logout oficial."""
+    authenticator = st.session_state.get("_authenticator_instance")
+    
+    # Se estivermos na main, style it better
+    if location == "main":
+        st.markdown("<br><hr style='border-color:rgba(139,92,246,0.2);'><br>", unsafe_allow_html=True)
+        
+        # Estilo para forçar o botão do streamlit-authenticator a ficar bonito
+        st.markdown("""
+        <style>
+        div[data-testid="stbutton"] > button {
+            width: 100%;
+        }
+        /* Alvo especifico: o botao de logout geralmente é o unico nessa area se isolado */
+        div.stButton > button {
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+        }
+        div.stButton > button:hover {
+            border-color: rgba(239, 68, 68, 0.6);
+            background: rgba(239, 68, 68, 0.2);
+            color: white;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        if authenticator:
+            try:
+                # O proprio authenticator renderiza o botao e faz a logica
+                authenticator.logout("🚪 ENCERRAR SESSÃO", location="main", key="logout_btn_main")
+            except Exception as e:
+                st.error(f"Erro no componente de logout: {e}")
+                # Fallback manual
+                if st.button("Logout de Emergência"):
+                    for key in list(st.session_state.keys()):
+                        del st.session_state[key]
+                    st.rerun()
+    else:
+        if authenticator is not None:
+            try:
+                authenticator.logout("ENCERRAR SESSÃO", location=location)
+            except Exception:
+                pass
+
+
+def get_current_user() -> Optional[str]:
+    """Retorna o username do usuário logado ou None."""
+    return st.session_state.get("username")
