@@ -1068,7 +1068,7 @@ _logo_href = f"?nav=inicio&session={_st}" if _st else "?nav=inicio"
 
 st.markdown(f"""
 <div class="top-nav">
-    <a href="{_logo_href}" target="_self" style="text-decoration:none;">
+    <a href="{_logo_href}" target="_parent" style="text-decoration:none;">
         <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
     </a>
     <div class="user-pill">
@@ -1337,7 +1337,7 @@ elif st.session_state['pagina'] == 'selecao_modulos':
                 _card_href = f"?nav=aula&modulo={arquivo}&session={_st}" if _st else f"?nav=aula&modulo={arquivo}"
                 
                 st.markdown(f"""
-<a href="{_card_href}" target="_self" style="text-decoration:none; color:inherit; display:block;">
+<a href="{_card_href}" target="_parent" style="text-decoration:none; color:inherit; display:block;">
 <div class="module-card-wrap" style="cursor:pointer;">
 <div class="module-card-inner">
 <div class="module-cover-wrap">
