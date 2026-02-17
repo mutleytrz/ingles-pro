@@ -952,6 +952,55 @@ def aplicar_estilo() -> None:
         font-family: 'Outfit', sans-serif;
     }
 
+    /* Prova Oral — Test Page */
+    .prova-header {
+        text-align: center; padding: 20px 0 10px;
+    }
+    .prova-header h2 {
+        font-size: 28px !important; font-weight: 800 !important;
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        margin: 0 !important;
+    }
+    .prova-header .prova-sub {
+        font-size: 14px; color: #94a3b8; margin-top: 6px;
+        font-family: 'Outfit', sans-serif;
+    }
+    .prova-progress-bar {
+        display: flex; gap: 4px; margin: 16px 0 24px;
+    }
+    .prova-dot {
+        flex: 1; height: 6px; border-radius: 3px;
+        background: rgba(255,255,255,0.08);
+        transition: background 0.3s ease;
+    }
+    .prova-dot.done { background: linear-gradient(90deg, #22c55e, #10b981); }
+    .prova-dot.active {
+        background: linear-gradient(90deg, #f59e0b, #ef4444);
+        box-shadow: 0 0 8px rgba(245,158,11,0.4);
+    }
+    .prova-resultado-wrap {
+        text-align: center; padding: 40px 20px;
+        background: linear-gradient(180deg, rgba(139,92,246,0.1), rgba(6,182,212,0.05));
+        border: 1px solid rgba(139,92,246,0.2);
+        border-radius: 20px; margin: 30px auto; max-width: 500px;
+        animation: fadeInUp 0.6s ease;
+    }
+    .prova-resultado-wrap .score-big {
+        font-size: 72px; font-weight: 900;
+        background: linear-gradient(135deg, #f59e0b, #22c55e);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        line-height: 1;
+    }
+    .prova-resultado-wrap .score-label {
+        font-size: 16px; color: #94a3b8; margin-top: 8px;
+        font-family: 'Outfit', sans-serif;
+    }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1108,9 +1157,62 @@ with st.sidebar:
         if st.button("🛡️ Painel Admin", use_container_width=True):
              st.session_state['pagina'] = 'admin_panel'
              st.rerun()
+        if st.button("🎤 Testar Prova Oral", use_container_width=True):
+             _arq = st.session_state.get('arquivo_atual', 'palavras.csv')
+             _banco = carregar_banco_especifico(_arq)
+             _mid = len(_banco) // 2
+             st.session_state['prova_modulo'] = _arq
+             st.session_state['prova_questoes'] = _build_test_questions(_banco, _mid, username)
+             st.session_state['prova_idx'] = 0
+             st.session_state['prova_acertos'] = 0
+             st.session_state['prova_total_palavras'] = 0
+             st.session_state['prova_tentativa'] = 0
+             st.session_state['pagina'] = 'prova_oral'
+             st.rerun()
              
     st.markdown("---")
     auth.render_logout(location="sidebar")
+
+# -- FUNCOES UTILITARIAS: PROVA ORAL --
+def _build_test_questions(banco, midpoint, username):
+    """Seleciona 20 questoes adaptativas: prioriza palavras com mais erros + reforco cross-modulo."""
+    weak = database.get_weak_words(username, limit=30)
+    weak_set = {w['word'] for w in weak}
+
+    # Pontua frases da 1a metade do modulo atual
+    first_half = banco[:midpoint]
+    scored = [(p, sum(1 for w in limpar(p['en']).split() if w in weak_set))
+              for p in first_half]
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    # Reforco cross-modulo: busca frases de OUTROS modulos com palavras fracas
+    current_mod = st.session_state['arquivo_atual']
+    cross = []
+    if weak_set:
+        for _, arquivo, _ in config.MODULOS:
+            if arquivo == current_mod:
+                continue
+            other = carregar_banco_especifico(arquivo)
+            for p in other:
+                score = sum(1 for w in limpar(p['en']).split() if w in weak_set)
+                if score > 0:
+                    cross.append((p, score))
+        cross.sort(key=lambda x: x[1], reverse=True)
+
+    # Monta: ~14 do modulo atual + ~6 cross-modulo
+    selected = [p for p, _ in scored[:14]]
+    cross_selected = [p for p, _ in cross[:6] if p not in selected]
+    selected += cross_selected
+
+    # Preenche ate 20 com aleatorias da 1a metade
+    if len(selected) < 20:
+        remaining = [p for p in first_half if p not in selected]
+        random.shuffle(remaining)
+        selected += remaining[:20 - len(selected)]
+
+    random.shuffle(selected)
+    return selected[:20]
+
 
 # -- ROUTING --
 if st.session_state['pagina'] == 'neural_sleep':
@@ -1600,6 +1702,10 @@ elif st.session_state['pagina'] == 'aula':
             acertos = len(acertos_list)
             st.markdown(fb_html, unsafe_allow_html=True)
 
+            # Rastreamento de erros por palavra (aprendizado adaptativo)
+            _wrong_words = [p for i, p in enumerate(alvo) if i >= len(dito) or dito[i] != p]
+            database.record_word_errors(username, _wrong_words, alvo)
+
             # Logica de XP e Sons
             if acertos > 0:
                 current_xp: int = int(st.session_state['xp'])
@@ -1630,11 +1736,26 @@ elif st.session_state['pagina'] == 'aula':
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.success("🎉 Perfeito! Avançando automaticamente...")
                 time.sleep(2)
-                st.session_state['indice'] = int(st.session_state['indice']) + 1
-                st.session_state['porc_atual'] = 0
-                st.session_state['tentativa'] = 0
-                salvar_progresso()
-                st.rerun()
+                _new_idx = int(st.session_state['indice']) + 1
+                _midpoint = total // 2
+                _flag_key = f'prova_feita_{st.session_state["arquivo_atual"]}'
+                if _new_idx == _midpoint and _flag_key not in st.session_state:
+                    st.session_state['prova_modulo'] = st.session_state['arquivo_atual']
+                    st.session_state['prova_questoes'] = _build_test_questions(banco, _midpoint, username)
+                    st.session_state['prova_idx'] = 0
+                    st.session_state['prova_acertos'] = 0
+                    st.session_state['prova_total_palavras'] = 0
+                    st.session_state['prova_tentativa'] = 0
+                    st.session_state['indice'] = _new_idx
+                    st.session_state['pagina'] = 'prova_oral'
+                    salvar_progresso()
+                    st.rerun()
+                else:
+                    st.session_state['indice'] = _new_idx
+                    st.session_state['porc_atual'] = 0
+                    st.session_state['tentativa'] = 0
+                    salvar_progresso()
+                    st.rerun()
 
 
     st.markdown('<div class="divider-glow"></div>', unsafe_allow_html=True)
@@ -1678,14 +1799,231 @@ elif st.session_state['pagina'] == 'aula':
 
         if can_go_next:
             if st.button("PRÓXIMA ➡", use_container_width=True):
-                st.session_state['indice'] = int(st.session_state['indice']) + 1
-                st.session_state['porc_atual'] = 0
-                st.session_state['tentativa'] = 0
-                salvar_progresso()
-                st.rerun()
+                _new_idx = int(st.session_state['indice']) + 1
+                _midpoint = total // 2
+                _flag_key = f'prova_feita_{st.session_state["arquivo_atual"]}'
+                if _new_idx == _midpoint and _flag_key not in st.session_state:
+                    st.session_state['prova_modulo'] = st.session_state['arquivo_atual']
+                    st.session_state['prova_questoes'] = _build_test_questions(banco, _midpoint, username)
+                    st.session_state['prova_idx'] = 0
+                    st.session_state['prova_acertos'] = 0
+                    st.session_state['prova_total_palavras'] = 0
+                    st.session_state['prova_tentativa'] = 0
+                    st.session_state['indice'] = _new_idx
+                    st.session_state['pagina'] = 'prova_oral'
+                    salvar_progresso()
+                    st.rerun()
+                else:
+                    st.session_state['indice'] = _new_idx
+                    st.session_state['porc_atual'] = 0
+                    st.session_state['tentativa'] = 0
+                    salvar_progresso()
+                    st.rerun()
         else:
             st.button("🔒 Bloqueado", disabled=True, use_container_width=True)
 
+
+# ========================================================
+# PROVA ORAL INTERATIVA (MID-MODULE TEST)
+# ========================================================
+
+elif st.session_state['pagina'] == 'prova_oral':
+    questoes = st.session_state.get('prova_questoes', [])
+    prova_idx = int(st.session_state.get('prova_idx', 0))
+    total_questoes = len(questoes) if questoes else 20
+
+    if not questoes:
+        st.error("Erro: Prova não encontrada.")
+        if st.button("Voltar"):
+            st.session_state['pagina'] = 'aula'
+            st.rerun()
+        st.stop()
+
+    # ---- RESULTADO FINAL ----
+    if prova_idx >= total_questoes:
+        total_acertos = int(st.session_state.get('prova_acertos', 0))
+        total_palavras = int(st.session_state.get('prova_total_palavras', 1))
+        pct_final = int((total_acertos / total_palavras) * 100) if total_palavras > 0 else 0
+
+        st.markdown("""
+<div class="prova-header">
+<h2>🏆 RESULTADO DA PROVA ORAL</h2>
+<div class="prova-sub">Parabéns por completar a avaliação!</div>
+</div>
+""", unsafe_allow_html=True)
+
+        # Barra de progresso completa
+        dots_html = '<div class="prova-progress-bar">'
+        for i in range(total_questoes):
+            dots_html += '<div class="prova-dot done"></div>'
+        dots_html += '</div>'
+        st.markdown(dots_html, unsafe_allow_html=True)
+
+        # Score grande animado
+        _emoji = "🌟" if pct_final >= 80 else ("👍" if pct_final >= 50 else "💪")
+        _msg = "Excelente!" if pct_final >= 80 else ("Bom trabalho!" if pct_final >= 50 else "Continue praticando!")
+        st.markdown(f"""
+<div class="prova-resultado-wrap">
+<div style="font-size:48px; margin-bottom:10px;">{_emoji}</div>
+<div class="score-big">{pct_final}%</div>
+<div class="score-label">Acertos: {total_acertos} / {total_palavras} palavras</div>
+<div style="margin-top:16px; font-size:18px; color:#e2e8f0; font-weight:600;">{_msg}</div>
+</div>
+""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        _s1, _btn, _s2 = st.columns([1, 2, 1])
+        with _btn:
+            if st.button("🚀 CONTINUAR MÓDULO ➡", use_container_width=True, type="primary"):
+                # Marca prova como feita e volta para a aula
+                _flag = f'prova_feita_{st.session_state.get("prova_modulo", "")}'
+                st.session_state[_flag] = True
+                st.session_state['pagina'] = 'aula'
+                st.session_state['porc_atual'] = 0
+                st.session_state['tentativa'] = 0
+                # Limpa estado da prova
+                for k in ['prova_questoes', 'prova_idx', 'prova_acertos',
+                          'prova_total_palavras', 'prova_modulo', 'prova_tentativa']:
+                    st.session_state.pop(k, None)
+                salvar_progresso()
+                st.rerun()
+        st.stop()
+
+    # ---- QUESTAO ATUAL ----
+    atual_q = questoes[prova_idx]
+
+    # Header
+    st.markdown(f"""
+<div class="prova-header">
+<h2>🎤 PROVA ORAL</h2>
+<div class="prova-sub">Questão {prova_idx + 1} de {total_questoes}</div>
+</div>
+""", unsafe_allow_html=True)
+
+    # Progress dots
+    dots_html = '<div class="prova-progress-bar">'
+    for i in range(total_questoes):
+        if i < prova_idx:
+            dots_html += '<div class="prova-dot done"></div>'
+        elif i == prova_idx:
+            dots_html += '<div class="prova-dot active"></div>'
+        else:
+            dots_html += '<div class="prova-dot"></div>'
+    dots_html += '</div>'
+    st.markdown(dots_html, unsafe_allow_html=True)
+
+    # Frase EN + PT
+    st.markdown(f"""
+<div class="phrase-box" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 25px 15px; background: linear-gradient(180deg, rgba(245,158,11,0.08) 0%, rgba(239,68,68,0.04) 100%); border-radius: 20px; margin-bottom:20px; border: 1px solid rgba(245,158,11,0.15);">
+    <div style="text-align:center; width:100%; font-size: 36px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; line-height: 1.3; margin-bottom: 12px;">
+        <img src="https://flagcdn.com/w40/us.png" class="flag-icon" alt="US">
+        {atual_q['en']}
+    </div>
+    <div style="text-align:center; width:100%; font-size: 20px; color: #94a3b8; font-style: italic; font-weight:500;">
+        <img src="https://flagcdn.com/w40/br.png" class="flag-icon" alt="BR">
+        {atual_q['pt']}
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # TTS "Como se fala" + Audio
+    _prova_audio_id = atual_q.get('id', f'prova_{prova_idx}')
+    _prova_ref = os.path.join(config.AUDIOS_DIR, f"prova_{_prova_audio_id}.mp3")
+    if not os.path.exists(_prova_ref):
+        try:
+            gTTS(text=str(atual_q['en']), lang='en').save(_prova_ref)
+        except Exception:
+            _prova_ref = None
+
+    c_tts, c_mic_p = st.columns([1, 2])
+    with c_tts:
+        if _prova_ref and os.path.exists(_prova_ref):
+            st.markdown("**🔊 Como se fala:**")
+            st.audio(_prova_ref)
+
+    # Gravacao
+    with c_mic_p:
+        gravacao_prova = mic_recorder(
+            start_prompt="🔴 GRAVAR",
+            stop_prompt="⏹️ PARAR",
+            format="wav",
+            key=f"prova_mic_{prova_idx}_{st.session_state.get('prova_tentativa', 0)}"
+        )
+
+    if gravacao_prova:
+        audio_data_p = io.BytesIO(gravacao_prova['bytes'])
+        with wave.open(audio_data_p, 'rb') as wf_p:
+            rec_p = KaldiRecognizer(model_vosk, wf_p.getframerate())
+            rec_p.AcceptWaveform(wf_p.readframes(wf_p.getnframes()))
+            ouvida_p = json.loads(rec_p.FinalResult()).get("text", "").lower()
+
+        # O sistema entendeu
+        _ouvi_p = ouvida_p.upper() if ouvida_p.strip() else "(silêncio detectado)"
+        st.markdown(f"""
+<div class="ouvi-box">
+    <div class="ouvi-label">🎤 O SISTEMA ENTENDEU:</div>
+    <div class="ouvi-text">{_ouvi_p}</div>
+</div>
+""", unsafe_allow_html=True)
+
+        # Feedback verde/vermelho
+        alvo_p = limpar(atual_q['en']).split()
+        dito_p = limpar(ouvida_p).split()
+
+        fb_html_p = '<div class="fb-container">'
+        acertos_p = 0
+        for idx_p, p in enumerate(alvo_p):
+            if idx_p < len(dito_p) and dito_p[idx_p] == p:
+                fb_html_p += f'<span class="fb-word fb-correct">{p.upper()}</span>'
+                acertos_p += 1
+            else:
+                fb_html_p += f'<span class="fb-word fb-wrong">{p.upper()}</span>'
+        fb_html_p += '</div>'
+        st.markdown(fb_html_p, unsafe_allow_html=True)
+
+        # Rastrear erros na prova tambem
+        _wrong_p = [p for i, p in enumerate(alvo_p) if i >= len(dito_p) or dito_p[i] != p]
+        database.record_word_errors(username, _wrong_p, alvo_p)
+
+        # Acumuladores
+        st.session_state['prova_acertos'] = int(st.session_state.get('prova_acertos', 0)) + acertos_p
+        st.session_state['prova_total_palavras'] = int(st.session_state.get('prova_total_palavras', 0)) + len(alvo_p)
+
+        # Score parcial
+        _pct_q = int((acertos_p / len(alvo_p)) * 100) if len(alvo_p) > 0 else 0
+        _pct_cls = "success" if _pct_q >= 80 else "fail"
+        st.markdown(f"""
+<div class="result-pct {_pct_cls}" style="text-align:center;">
+    {_pct_q}%
+</div>
+""", unsafe_allow_html=True)
+
+        # Botao proxima questao
+        st.markdown("<br>", unsafe_allow_html=True)
+        _s1q, _btnq, _s2q = st.columns([1, 2, 1])
+        with _btnq:
+            _next_label = "PRÓXIMA QUESTÃO ➡" if (prova_idx + 1) < total_questoes else "🏆 VER RESULTADO"
+            if st.button(_next_label, use_container_width=True, type="primary", key=f"prova_next_{prova_idx}"):
+                st.session_state['prova_idx'] = prova_idx + 1
+                st.session_state['prova_tentativa'] = 0
+                st.rerun()
+
+    # Botao repetir (se nao gravou ainda ou quer tentar de novo)
+    if not gravacao_prova:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info("🎤 Grave sua resposta acima para ver o feedback.")
+
+    # Botao sair da prova (emergencia)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    if st.button("❌ SAIR DA PROVA", key="btn_sair_prova"):
+        _flag = f'prova_feita_{st.session_state.get("prova_modulo", "")}'
+        st.session_state[_flag] = True
+        st.session_state['pagina'] = 'aula'
+        for k in ['prova_questoes', 'prova_idx', 'prova_acertos',
+                  'prova_total_palavras', 'prova_modulo', 'prova_tentativa']:
+            st.session_state.pop(k, None)
+        salvar_progresso()
+        st.rerun()
 
 
 # -- FIM DO APP --

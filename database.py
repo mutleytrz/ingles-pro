@@ -208,6 +208,21 @@ def _check_migrations():
             )
         """)
         conn.commit()
+
+        # Word errors table (adaptive learning — tracks per-word error counts)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS word_errors (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                username    TEXT    NOT NULL,
+                word        TEXT    NOT NULL,
+                error_count INTEGER DEFAULT 0,
+                total_seen  INTEGER DEFAULT 0,
+                last_seen   TEXT,
+                UNIQUE(username, word),
+                FOREIGN KEY (username) REFERENCES users(username)
+            )
+        """)
+        conn.commit()
     except Exception as e:
         print(f"[ERR] Falha na migracao: {e}")
     finally:
@@ -509,6 +524,50 @@ def load_lesson_score(username: str, module_file: str, lesson_idx: int) -> int:
     return 0
 
 
+# -- Erros por Palavra (Aprendizado Adaptativo) --
+
+def record_word_errors(username: str, wrong_words: list[str], all_words: list[str]) -> None:
+    """Registra erros por palavra. Incrementa error_count para erradas, total_seen para todas."""
+    conn = _get_conn()
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        wrong_set = set(wrong_words)
+        for w in all_words:
+            is_wrong = 1 if w in wrong_set else 0
+            conn.execute("""
+                INSERT INTO word_errors (username, word, error_count, total_seen, last_seen)
+                VALUES (?, ?, ?, 1, ?)
+                ON CONFLICT(username, word) DO UPDATE SET
+                    error_count = word_errors.error_count + ?,
+                    total_seen = word_errors.total_seen + 1,
+                    last_seen = ?
+            """, (username, w, is_wrong, now, is_wrong, now))
+        conn.commit()
+    except Exception as e:
+        print(f"[ERR] record_word_errors: {e}")
+    finally:
+        conn.close()
+
+
+def get_weak_words(username: str, limit: int = 30) -> list[dict]:
+    """Retorna palavras com mais erros (error_count >= 2), ordenadas por frequencia de erro."""
+    conn = _get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT word, error_count, total_seen
+            FROM word_errors
+            WHERE username = ? AND error_count >= 2
+            ORDER BY error_count DESC
+            LIMIT ?
+        """, (username, limit)).fetchall()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[ERR] get_weak_words: {e}")
+        return []
+    finally:
+        conn.close()
+
+
 def delete_user(username: str) -> bool:
     """Remove completamente um usuario e seus dados."""
     conn = _get_conn()
@@ -519,6 +578,8 @@ def delete_user(username: str) -> bool:
         # Verifica se lesson_scores existe antes de tentar deletar
         if "lesson_scores" in _get_tables(conn):
              conn.execute("DELETE FROM lesson_scores WHERE username = ?", (username,))
+        if "word_errors" in _get_tables(conn):
+             conn.execute("DELETE FROM word_errors WHERE username = ?", (username,))
         conn.execute("DELETE FROM users WHERE username = ?", (username,))
         conn.commit()
         return True
