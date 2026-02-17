@@ -1361,6 +1361,12 @@ elif st.session_state['pagina'] == 'selecao_modulos':
 </a>
 """, unsafe_allow_html=True)
 
+                if st.button("ACESSAR MÓDULO", key=f"btn_mod_{arquivo}", use_container_width=True, type="primary"):
+                    st.session_state['pagina'] = 'aula'
+                    st.session_state['arquivo_atual'] = arquivo
+                    salvar_progresso()
+                    st.rerun()
+
 
 
 
