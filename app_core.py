@@ -1062,9 +1062,13 @@ is_admin = database.is_user_admin(username)
 # -- NAV BAR --
 _tier_name, _tier_color, _tier_emoji = _get_xp_tier(int(st.session_state['xp']))
 
+# Monta link da logo preservando session token
+_st = st.query_params.get("session", "")
+_logo_href = f"?nav=inicio&session={_st}" if _st else "?nav=inicio"
+
 st.markdown(f"""
 <div class="top-nav">
-    <a href="#" onclick="(function(){{ var s=new URLSearchParams(window.location.search).get('session')||''; window.location.href='?nav=inicio'+(s?'&session='+s:''); return false; }})(); return false;" style="text-decoration:none; cursor:pointer;">
+    <a href="{_logo_href}" target="_self" style="text-decoration:none;">
         <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
     </a>
     <div class="user-pill">
@@ -1324,13 +1328,17 @@ elif st.session_state['pagina'] == 'selecao_modulos':
                 # Se nao tiver capa local (erro de download), usa um placeholder dark
                 img_src = f"data:image/jpeg;base64,{cover_b64}" if cover_b64 else url_backup
 
-                # Card Interativo (Premium 3D) — Clicável via JavaScript
+                # Card Interativo (Premium 3D) — Clicável via link
                 _status_text = '✅ CONCLUÍDO' if mod_pct == 100 else ('🚀 EM ANDAMENTO' if mod_pct > 0 else '⏳ INICIAR')
                 _status_class = 'concluido' if mod_pct == 100 else ('andamento' if mod_pct > 0 else 'pendente')
                 
+                # Monta link preservando session token
+                _st = st.query_params.get('session', '')
+                _card_href = f"?nav=aula&modulo={arquivo}&session={_st}" if _st else f"?nav=aula&modulo={arquivo}"
+                
                 st.markdown(f"""
-<a href="#" onclick="(function(){{ var s=new URLSearchParams(window.location.search).get('session')||''; window.location.href='?nav=aula&modulo={arquivo}'+(s?'&session='+s:''); return false; }})(); return false;" style="text-decoration:none; color:inherit; display:block; cursor:pointer;">
-<div class="module-card-wrap">
+<a href="{_card_href}" target="_self" style="text-decoration:none; color:inherit; display:block;">
+<div class="module-card-wrap" style="cursor:pointer;">
 <div class="module-card-inner">
 <div class="module-cover-wrap">
 <img src="{img_src}" class="module-cover">
