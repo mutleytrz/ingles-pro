@@ -382,9 +382,28 @@ def aplicar_estilo() -> None:
         filter: saturate(1.15) brightness(1.05);
     }
     .module-cover-overlay {
-        position: absolute; bottom: 0; left: 0; right: 0; height: 60%;
-        background: linear-gradient(to top, rgba(15, 10, 40, 0.9), transparent);
-        pointer-events: none;
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.3);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        display: flex; align-items: center; justify-content: center;
+        backdrop-filter: blur(2px);
+    }
+    .module-card-inner:hover .module-cover-overlay {
+        opacity: 1;
+    }
+    .play-icon-overlay {
+        font-size: 48px; color: #fff;
+        background: rgba(139, 92, 246, 0.8);
+        width: 80px; height: 80px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+        transform: scale(0.8);
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .module-card-inner:hover .play-icon-overlay {
+        transform: scale(1);
     }
     .module-version-tag {
         position: absolute; top: 12px; right: 12px;
@@ -935,6 +954,7 @@ def aplicar_estilo() -> None:
 """, unsafe_allow_html=True)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def carregar_banco_especifico(nome_arquivo: str) -> list[dict]:
     caminho = os.path.join(config.CSV_DIR, nome_arquivo)
     if os.path.exists(caminho):
@@ -955,6 +975,11 @@ for k, v in {
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# -- NAV LOGIC (URL-BASED NAVIGATION) --
+if st.query_params.get("nav") == "inicio":
+    st.session_state['pagina'] = 'inicio'
+    st.query_params.pop("nav", None)
 
 aplicar_estilo()
 
@@ -1023,7 +1048,9 @@ is_admin = database.is_user_admin(username)
 _tier_name, _tier_color, _tier_emoji = _get_xp_tier(int(st.session_state['xp']))
 st.markdown(f"""
 <div class="top-nav">
-    <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
+    <a href="?nav=inicio" target="_self" style="text-decoration:none;">
+        <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
+    </a>
     <div class="user-pill">
         <span>👤 {st.session_state.get('name', username)}</span>
         <span class="xp-tier-badge" style="background:rgba(139,92,246,0.1);color:{_tier_color};border:1px solid {_tier_color}33;">{_tier_emoji} {_tier_name}</span>
@@ -1290,7 +1317,9 @@ elif st.session_state['pagina'] == 'selecao_modulos':
 <div class="module-card-inner">
 <div class="module-cover-wrap">
 <img src="{img_src}" class="module-cover">
-<div class="module-cover-overlay"></div>
+<div class="module-cover-overlay">
+    <div class="play-icon-overlay">▶</div>
+</div>
 <div class="module-version-tag">PRO v3.0</div>
 </div>
 <div class="module-info">
