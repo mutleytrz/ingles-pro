@@ -266,10 +266,36 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                     st.session_state["_authenticator"] = authenticator
                     return username_logged
                 else:
-                    # Nao verificado -> Logout forcado e manda pra tela de verificacao
-                    authenticator.logout("main") # limpa cookie
-                    st.session_state["pending_verification_user"] = username_logged
-                    st.rerun()
+                    # Nao verificado -> gera novo codigo e reenvia email
+                    if _is_smtp_configured():
+                        new_code = _generate_code()
+                        # Busca o email do usuario
+                        try:
+                            conn = database._get_conn()
+                            row = conn.execute("SELECT email FROM users WHERE username=?", (username_logged,)).fetchone()
+                            user_email = row["email"] if row else None
+                            # Atualiza codigo no banco
+                            conn.execute("UPDATE users SET verification_code=? WHERE username=?", (new_code, username_logged))
+                            conn.commit()
+                            conn.close()
+                            if user_email:
+                                email_service.send_verification_email(user_email, new_code)
+                        except Exception as e:
+                            print(f"[ERR] Falha ao reenviar codigo: {e}")
+                        authenticator.logout("main")
+                        st.session_state["pending_verification_user"] = username_logged
+                        st.rerun()
+                    else:
+                        # Sem SMTP: auto-verificar o usuario
+                        try:
+                            conn = database._get_conn()
+                            conn.execute("UPDATE users SET email_verified=1 WHERE username=?", (username_logged,))
+                            conn.commit()
+                            conn.close()
+                        except Exception:
+                            pass
+                        st.session_state["_authenticator"] = authenticator
+                        return username_logged
 
             elif st.session_state.get("authentication_status") is False:
                 st.error("❌ Usuário ou senha incorretos.")
