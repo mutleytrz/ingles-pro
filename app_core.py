@@ -71,6 +71,7 @@ def _get_xp_tier(xp: int) -> tuple[str, str, str]:
 def aplicar_estilo() -> None:
     # DESIGN: "COSMIC ACADEMY" — Premium Futuristic Design
     st.markdown("""
+    <style>
     /* ============================================
        STATIC STYLING (PERFORMANCE OPTIMIZED)
        ============================================ */
