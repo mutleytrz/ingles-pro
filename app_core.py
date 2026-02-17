@@ -978,33 +978,34 @@ username = auth.render_login()
 if username is None:
     st.stop()
 
-# -----------------------------------------------------------
-# FIX: Prevents session leaking (User A data persisting to User B)
-# -----------------------------------------------------------
-if 'logged_in_user' not in st.session_state:
-    st.session_state['logged_in_user'] = None
-
-if st.session_state['logged_in_user'] != username:
-    # Detected user switch or fresh login
-    st.session_state['logged_in_user'] = username
-    
-    # 1. Clear critical session keys - FIX: Only if not matching expected structure
-    # This prevents accidental wipe on reload
-    keys_to_reset = ['xp', 'indice', 'porc_atual', 'tentativa', 'pagina', 'arquivo_atual', '_progresso_carregado']
-    if st.session_state['logged_in_user'] is not None:
-         # Only reset if we are definitely switching users (e.g. None -> User or User A -> User B)
-        for k in keys_to_reset:
-            if k in st.session_state:
-                del st.session_state[k]
-            
-    # 2. Re-apply defaults for safety
-    dt_defaults = {
-        'pagina': 'inicio',
-        'arquivo_atual': 'palavras.csv',
-        'indice': 0, 'xp': 0, 'porc_atual': 0, 'tentativa': 0
-    }
-    for k, v in dt_defaults.items():
-        st.session_state[k] = v
+    # -----------------------------------------------------------
+    # FIX: Prevents session leaking (User A data persisting to User B)
+    # DISABLED: Causing issues with F5 refresh. Auth handles cleanup.
+    # -----------------------------------------------------------
+    # if 'logged_in_user' not in st.session_state:
+    #     st.session_state['logged_in_user'] = None
+    #
+    # if st.session_state['logged_in_user'] != username:
+    #     # Detected user switch or fresh login
+    #     st.session_state['logged_in_user'] = username
+    #    
+    #     # 1. Clear critical session keys - FIX: Only if not matching expected structure
+    #     # This prevents accidental wipe on reload
+    #     keys_to_reset = ['xp', 'indice', 'porc_atual', 'tentativa', 'pagina', 'arquivo_atual', '_progresso_carregado']
+    #     if st.session_state['logged_in_user'] is not None:
+    #          # Only reset if we are definitely switching users (e.g. None -> User or User A -> User B)
+    #         for k in keys_to_reset:
+    #             if k in st.session_state:
+    #                 del st.session_state[k]
+    #            
+    #     # 2. Re-apply defaults for safety
+    #     dt_defaults = {
+    #         'pagina': 'inicio',
+    #         'arquivo_atual': 'palavras.csv',
+    #         'indice': 0, 'xp': 0, 'porc_atual': 0, 'tentativa': 0
+    #     }
+    #     for k, v in dt_defaults.items():
+    #         st.session_state[k] = v
         
     # 3. Force rerun removed to avoid infinite reload loops on some systems
     # st.rerun()  <-- REMOVED to improve stability
