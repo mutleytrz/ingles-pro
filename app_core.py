@@ -978,62 +978,9 @@ username = auth.render_login()
 if username is None:
     st.stop()
 
-    # -----------------------------------------------------------
-    # FIX: Prevents session leaking (User A data persisting to User B)
-    # DISABLED: Causing issues with F5 refresh. Auth handles cleanup.
-    # -----------------------------------------------------------
-    # if 'logged_in_user' not in st.session_state:
-    #     st.session_state['logged_in_user'] = None
-    #
-    # if st.session_state['logged_in_user'] != username:
-    #     # Detected user switch or fresh login
-    #     st.session_state['logged_in_user'] = username
-    #    
-    #     # 1. Clear critical session keys - FIX: Only if not matching expected structure
-    #     # This prevents accidental wipe on reload
-    #     keys_to_reset = ['xp', 'indice', 'porc_atual', 'tentativa', 'pagina', 'arquivo_atual', '_progresso_carregado']
-    #     if st.session_state['logged_in_user'] is not None:
-    #          # Only reset if we are definitely switching users (e.g. None -> User or User A -> User B)
-    #         for k in keys_to_reset:
-    #             if k in st.session_state:
-    #                 del st.session_state[k]
-    #            
-    #     # 2. Re-apply defaults for safety
-    #     dt_defaults = {
-    #         'pagina': 'inicio',
-    #         'arquivo_atual': 'palavras.csv',
-    #         'indice': 0, 'xp': 0, 'porc_atual': 0, 'tentativa': 0
-    #     }
-    #     for k, v in dt_defaults.items():
-    #         st.session_state[k] = v
-        
-    # 3. Force rerun removed to avoid infinite reload loops on some systems
-    # st.rerun()  <-- REMOVED to improve stability
-    pass
-if username is None:
-    st.stop()
-
-is_admin = database.is_user_admin(username)
-
-
-# -- NAV BAR --
-_tier_name, _tier_color, _tier_emoji = _get_xp_tier(int(st.session_state['xp']))
-st.markdown(f"""
-<div class="top-nav">
-    <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
-    <div class="user-pill">
-        <span>👤 {st.session_state.get('name', username)}</span>
-        <span class="xp-tier-badge" style="background:rgba(139,92,246,0.1);color:{_tier_color};border:1px solid {_tier_color}33;">{_tier_emoji} {_tier_name}</span>
-        <span class="xp-badge">⭐ {st.session_state['xp']} XP</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# -- GOD MODE CHECK --
-god_mode = st.session_state.get('god_mode', False)
-
-
-# -- Progresso --
+# -----------------------------------------------------------
+# CARREGAR DADOS DO USUÁRIO (CRÍTICO: ANTES DA RENDERIZAÇÃO)
+# -----------------------------------------------------------
 def salvar_progresso():
     database.save_progress(
         username=username,
@@ -1057,7 +1004,6 @@ def carregar_progresso():
             st.session_state[k] = v
     else:
         # CRITICAL: Novo usuário (sem dados no banco) deve ter sessão LIMPA
-        # Sobrescreve explicitamente para evitar herança de dados da sessão anterior
         defaults = {
             'pagina': 'inicio',
             'arquivo_atual': 'palavras.csv',
@@ -1069,6 +1015,27 @@ def carregar_progresso():
 if '_progresso_carregado' not in st.session_state:
     carregar_progresso()
     st.session_state['_progresso_carregado'] = True
+
+is_admin = database.is_user_admin(username)
+
+
+# -- NAV BAR --
+_tier_name, _tier_color, _tier_emoji = _get_xp_tier(int(st.session_state['xp']))
+st.markdown(f"""
+<div class="top-nav">
+    <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
+    <div class="user-pill">
+        <span>👤 {st.session_state.get('name', username)}</span>
+        <span class="xp-tier-badge" style="background:rgba(139,92,246,0.1);color:{_tier_color};border:1px solid {_tier_color}33;">{_tier_emoji} {_tier_name}</span>
+        <span class="xp-badge">⭐ {st.session_state['xp']} XP</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# -- GOD MODE CHECK --
+god_mode = st.session_state.get('god_mode', False)
+
+
 
 
 # ========================================================
