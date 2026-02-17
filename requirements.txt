@@ -6,3 +6,4 @@ vosk
 pandas
 bcrypt
 requests
+pysqlite3-binary
