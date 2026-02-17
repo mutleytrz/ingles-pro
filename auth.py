@@ -16,10 +16,16 @@ def _build_authenticator():
     if not creds["usernames"]:
         return None
 
+    # Ler SECRET_KEY em tempo real (st.secrets > config)
+    try:
+        cookie_secret = st.secrets.get("SECRET_KEY", None) or config.SECRET_KEY
+    except Exception:
+        cookie_secret = config.SECRET_KEY
+
     authenticator = stauth.Authenticate(
         credentials={"usernames": creds["usernames"]},
         cookie_name="ingles_pro_cookie",
-        cookie_key=config.SECRET_KEY,
+        cookie_key=cookie_secret,
         cookie_expiry_days=30,
         auto_hash=False,  # já salvamos hashed no banco
     )
