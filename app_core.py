@@ -992,8 +992,9 @@ if st.query_params.get("nav") == "aula":
         st.session_state['tentativa'] = 0
         st.session_state['pagina'] = 'aula'
         
-        # Limpa params para URL limpa
-        st.query_params.clear()
+        # Limpa APENAS nav e modulo, preserva session token
+        st.query_params.pop("nav", None)
+        st.query_params.pop("modulo", None)
 
 aplicar_estilo()
 
@@ -1323,19 +1324,13 @@ elif st.session_state['pagina'] == 'selecao_modulos':
                 # Se nao tiver capa local (erro de download), usa um placeholder dark
                 img_src = f"data:image/jpeg;base64,{cover_b64}" if cover_b64 else url_backup
 
-                # Card Interativo (Premium 3D) — Clicável via link
+                # Card Interativo (Premium 3D) — Clicável via JavaScript
                 _status_text = '✅ CONCLUÍDO' if mod_pct == 100 else ('🚀 EM ANDAMENTO' if mod_pct > 0 else '⏳ INICIAR')
                 _status_class = 'concluido' if mod_pct == 100 else ('andamento' if mod_pct > 0 else 'pendente')
                 
-                # Monta link que preserva session token
-                _card_href = f"?nav=aula&modulo={arquivo}"
-                _card_session = st.query_params.get('session', '')
-                if _card_session:
-                    _card_href += f"&session={_card_session}"
-                
                 st.markdown(f"""
-<a href="{_card_href}" target="_self" style="text-decoration:none; color:inherit; display:block;">
-<div class="module-card-wrap" style="cursor:pointer;">
+<a href="#" onclick="(function(){{ var s=new URLSearchParams(window.location.search).get('session')||''; window.location.href='?nav=aula&modulo={arquivo}'+(s?'&session='+s:''); return false; }})(); return false;" style="text-decoration:none; color:inherit; display:block; cursor:pointer;">
+<div class="module-card-wrap">
 <div class="module-card-inner">
 <div class="module-cover-wrap">
 <img src="{img_src}" class="module-cover">
