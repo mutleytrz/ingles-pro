@@ -250,6 +250,13 @@ def render_login() -> Optional[str]:
     # ------------------------------------------------------------------
     # URL SESSION CHECK (NUCLEAR OPTION ☢️)
     # ------------------------------------------------------------------
+    
+    # [LOGOUT DETECTION] 
+    # Verifica se o usuario clicou em sair ANTES de qualquer logica de login
+    if st.session_state.get("logout_btn_main") or st.session_state.get("logout_btn_sidebar"):
+        st.query_params.clear()
+        return None
+
     # Se nao esta logado, checa se tem token na URL
     if st.session_state.get("authentication_status") is not True:
         query_params = st.query_params
@@ -260,7 +267,7 @@ def render_login() -> Optional[str]:
                 # Login automatico via URL
                 st.session_state["authentication_status"] = True
                 st.session_state["username"] = valid_user
-                st.session_state["name"] = valid_user # Pode buscar nome real no DB se quiser
+                st.session_state["name"] = valid_user 
                 st.session_state["logout"] = False
                 st.rerun()
     # ------------------------------------------------------------------
@@ -277,7 +284,7 @@ def render_login() -> Optional[str]:
         return None
 
     # 2. Tela Normal de Login
-    # 2. Tela Normal de Login - HERO HEADER REWORK
+    # ... (Keep existing UI code) ...
     st.markdown("""
 <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding-top:60px; margin-bottom:50px; animation:fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);">
 <div class="sys-badge" style="border-color:rgba(6,182,212,0.5); background:rgba(6,182,212,0.1); color:#22d3ee; margin-bottom:20px; box-shadow:0 0 15px rgba(6,182,212,0.2);">
@@ -309,7 +316,6 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
     
     with c_main:
         if authenticator is not None:
-            # try:
             authenticator.login(
                 location="main",
                 fields={
@@ -319,8 +325,6 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                     "Login": "ENTRAR NO SISTEMA",
                 },
             )
-            # except Exception:
-            #     authenticator.login("main")
 
             # ------------------------------------------------------------------
             # CRITICAL FIX: FORCE SESSION CLEANUP IF NOT AUTHENTICATED
@@ -343,9 +347,12 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                     # ------------------------------------------------------------------
                     # NUCLEAR URL PERSISTENCE ☢️
                     # ------------------------------------------------------------------
-                    # Gera token e coloca na URL
-                    token = create_session_token(username_logged)
-                    st.query_params["session"] = token
+                    # Só atualiza o token se não existir ou se for inválido
+                    # Isso evita o loop infinito de refresh da URL (que causa o bug do logout)
+                    current_token = st.query_params.get("session")
+                    if not current_token or not validate_session_token(current_token):
+                         token = create_session_token(username_logged)
+                         st.query_params["session"] = token
                     # ------------------------------------------------------------------
 
                     return username_logged
@@ -381,8 +388,10 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                         st.session_state["_authenticator"] = authenticator
                         
                         # NUCLEAR URL PERSISTENCE (fallback path)
-                        token = create_session_token(username_logged)
-                        st.query_params["session"] = token
+                        current_token = st.query_params.get("session")
+                        if not current_token or not validate_session_token(current_token):
+                             token = create_session_token(username_logged)
+                             st.query_params["session"] = token
                         
                         return username_logged
 
@@ -404,14 +413,10 @@ def render_logout(location="sidebar"):
     # Se estivermos na main, style it better
     if location == "main":
         st.markdown("<br><hr style='border-color:rgba(139,92,246,0.2);'><br>", unsafe_allow_html=True)
-        
-        # Estilo para forçar o botão do streamlit-authenticator a ficar bonito
+        # ... styles ...
         st.markdown("""
         <style>
-        div[data-testid="stbutton"] > button {
-            width: 100%;
-        }
-        /* Alvo especifico: o botao de logout geralmente é o unico nessa area se isolado */
+        div[data-testid="stbutton"] > button { width: 100%; }
         div.stButton > button {
             border: 1px solid rgba(239, 68, 68, 0.3);
             background: rgba(239, 68, 68, 0.1);
@@ -428,7 +433,10 @@ def render_logout(location="sidebar"):
         if authenticator:
             try:
                 # O proprio authenticator renderiza o botao e faz a logica
-                authenticator.logout("🚪 ENCERRAR SESSÃO", location="main", key="logout_btn_main")
+                # Usar chave EXPLICITA para detecção antecipada
+                if authenticator.logout("🚪 ENCERRAR SESSÃO", location="main", key="logout_btn_main"):
+                    st.query_params.clear()
+                    st.rerun()
             except Exception as e:
                 st.error(f"Erro no componente de logout: {e}")
                 # Fallback manual
@@ -442,7 +450,8 @@ def render_logout(location="sidebar"):
             try:
                 # O metodo logout do authenticator retorna True se o usuario clicou em sair
                 # Mas precisamos garantir que ele limpe a URL
-                if authenticator.logout("ENCERRAR SESSÃO", location=location):
+                # Usar chave EXPLICITA para detecção antecipada
+                if authenticator.logout("ENCERRAR SESSÃO", location=location, key="logout_btn_sidebar"):
                     st.query_params.clear()
                     st.rerun()
             except Exception:
