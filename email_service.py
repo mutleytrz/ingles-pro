@@ -40,8 +40,13 @@ def send_verification_email(to_email: str, code: str) -> bool:
     password = smtp["password"]
 
     message = MIMEMultipart("alternative")
+    from email.utils import formataddr
     message["Subject"] = f"Seu código de verificação: {code}"
-    message["From"] = f"{smtp['from_name']} <{sender_email}>"
+    # Garante que o nome do remetente seja respeitado (RFC 5322)
+    display_name = smtp['from_name'].strip()
+    if not display_name or display_name.lower() == "eu":
+        display_name = "English Pro AI"
+    message["From"] = formataddr((display_name, sender_email))
     message["To"] = to_email
 
     # Versao texto simples

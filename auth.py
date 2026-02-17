@@ -27,8 +27,11 @@ def _build_authenticator():
         cookie_name="ingles_pro_cookie",
         cookie_key=cookie_secret,
         cookie_expiry_days=30,
-        auto_hash=False,  # já salvamos hashed no banco
+        auto_hash=False,
     )
+    # [DEBUG]
+    # print(f"[AUTH] Authenticator built. Cookie: ingles_pro_cookie. Secret len: {len(str(cookie_secret))}")
+    return authenticator
     return authenticator
 
 
