@@ -981,6 +981,20 @@ if st.query_params.get("nav") == "inicio":
     st.session_state['pagina'] = 'inicio'
     st.query_params.pop("nav", None)
 
+if st.query_params.get("nav") == "aula":
+    _mod_target = st.query_params.get("modulo")
+    if _mod_target:
+        st.session_state['arquivo_atual'] = _mod_target
+        # Carrega indice salvo
+        _saved_idx = database.load_module_progress(st.session_state.get('username', ''), _mod_target)
+        st.session_state['indice'] = _saved_idx
+        st.session_state['porc_atual'] = 0
+        st.session_state['tentativa'] = 0
+        st.session_state['pagina'] = 'aula'
+        
+        # Limpa params para URL limpa
+        st.query_params.clear()
+
 aplicar_estilo()
 
 
@@ -1046,9 +1060,10 @@ is_admin = database.is_user_admin(username)
 
 # -- NAV BAR --
 _tier_name, _tier_color, _tier_emoji = _get_xp_tier(int(st.session_state['xp']))
+
 st.markdown(f"""
 <div class="top-nav">
-    <a href="?nav=inicio" target="_self" style="text-decoration:none;">
+    <a href="#" onclick="(function(){{ var s=new URLSearchParams(window.location.search).get('session')||''; window.location.href='?nav=inicio'+(s?'&session='+s:''); return false; }})(); return false;" style="text-decoration:none; cursor:pointer;">
         <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
     </a>
     <div class="user-pill">
@@ -1308,18 +1323,22 @@ elif st.session_state['pagina'] == 'selecao_modulos':
                 # Se nao tiver capa local (erro de download), usa um placeholder dark
                 img_src = f"data:image/jpeg;base64,{cover_b64}" if cover_b64 else url_backup
 
-                # Card Interativo (Premium 3D)
+                # Card Interativo (Premium 3D) — Clicável via link
                 _status_text = '✅ CONCLUÍDO' if mod_pct == 100 else ('🚀 EM ANDAMENTO' if mod_pct > 0 else '⏳ INICIAR')
                 _status_class = 'concluido' if mod_pct == 100 else ('andamento' if mod_pct > 0 else 'pendente')
                 
+                # Monta link que preserva session token
+                _card_href = f"?nav=aula&modulo={arquivo}"
+                _card_session = st.query_params.get('session', '')
+                if _card_session:
+                    _card_href += f"&session={_card_session}"
+                
                 st.markdown(f"""
-<div class="module-card-wrap">
+<a href="{_card_href}" target="_self" style="text-decoration:none; color:inherit; display:block;">
+<div class="module-card-wrap" style="cursor:pointer;">
 <div class="module-card-inner">
 <div class="module-cover-wrap">
 <img src="{img_src}" class="module-cover">
-<div class="module-cover-overlay">
-    <div class="play-icon-overlay">▶</div>
-</div>
 <div class="module-version-tag">PRO v3.0</div>
 </div>
 <div class="module-info">
@@ -1336,18 +1355,10 @@ elif st.session_state['pagina'] == 'selecao_modulos':
 </div>
 </div>
 </div>
+</a>
 """, unsafe_allow_html=True)
-                
-                # Botao de Acao (Invisible overlay simulated by st.button below card)
-                if st.button(f"ACESSAR {titulo}", key=f"start_{arquivo}", use_container_width=True):
-                    saved_indice = database.load_module_progress(username, arquivo)
-                    st.session_state['arquivo_atual'] = arquivo
-                    st.session_state['indice'] = saved_indice
-                    st.session_state['porc_atual'] = 0
-                    st.session_state['tentativa'] = 0
-                    st.session_state['pagina'] = 'aula'
-                    salvar_progresso()
-                    st.rerun()
+
+
 
 
 elif st.session_state['pagina'] == 'aula':
