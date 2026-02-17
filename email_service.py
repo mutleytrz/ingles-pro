@@ -4,18 +4,44 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import config
 
+
+def _get_smtp_runtime():
+    """Busca SMTP config em tempo real (st.secrets > config)."""
+    smtp = {"host": "", "user": "", "password": "", "port": 587, "from_name": "English Pro AI"}
+    try:
+        import streamlit as st
+        smtp["host"] = st.secrets.get("SMTP_HOST", "") or ""
+        smtp["user"] = st.secrets.get("SMTP_USER", "") or ""
+        smtp["password"] = st.secrets.get("SMTP_PASS", "") or ""
+        smtp["port"] = int(st.secrets.get("SMTP_PORT", 587))
+        smtp["from_name"] = st.secrets.get("SMTP_FROM_NAME", "English Pro AI") or "English Pro AI"
+    except Exception:
+        pass
+    if not smtp["host"]:
+        smtp["host"] = config.SMTP_HOST
+    if not smtp["user"]:
+        smtp["user"] = config.SMTP_USER
+    if not smtp["password"]:
+        smtp["password"] = config.SMTP_PASS
+    if not smtp["from_name"]:
+        smtp["from_name"] = config.SMTP_FROM_NAME
+    return smtp
+
+
 def send_verification_email(to_email: str, code: str) -> bool:
     """Envia email com codigo de verificacao."""
-    if not config.SMTP_HOST or not config.SMTP_USER:
-        print(f"\n[DEV-MODE] SMTP nao configurado. CODIGO DE VERIFICACAO: {code}\n")
-        return True # Retorna True para permitir testar o fluxo UI
-
-    sender_email = config.SMTP_USER
-    password = config.SMTP_PASS
+    smtp = _get_smtp_runtime()
     
+    if not smtp["host"] or not smtp["user"]:
+        print(f"\n[DEV-MODE] SMTP nao configurado. CODIGO DE VERIFICACAO: {code}\n")
+        return True  # Retorna True para permitir testar o fluxo UI
+
+    sender_email = smtp["user"]
+    password = smtp["password"]
+
     message = MIMEMultipart("alternative")
     message["Subject"] = f"Seu código de verificação: {code}"
-    message["From"] = f"{config.SMTP_FROM_NAME} <{sender_email}>"
+    message["From"] = f"{smtp['from_name']} <{sender_email}>"
     message["To"] = to_email
 
     # Versao texto simples
@@ -61,7 +87,7 @@ def send_verification_email(to_email: str, code: str) -> bool:
 
     try:
         context = ssl.create_default_context()
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
+        with smtplib.SMTP(smtp["host"], smtp["port"]) as server:
             server.starttls(context=context)
             server.login(sender_email, password)
             server.sendmail(sender_email, to_email, message.as_string())

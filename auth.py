@@ -31,15 +31,37 @@ def _generate_code() -> str:
     return str(random.randint(100000, 999999))
 
 
+def _get_smtp_config() -> dict:
+    """Busca config SMTP em tempo real (st.secrets > config)."""
+    smtp = {"host": "", "user": "", "password": "", "port": 587, "from_name": "English Pro AI"}
+    # Tenta st.secrets primeiro (Streamlit Cloud)
+    try:
+        smtp["host"] = st.secrets.get("SMTP_HOST", "") or ""
+        smtp["user"] = st.secrets.get("SMTP_USER", "") or ""
+        smtp["password"] = st.secrets.get("SMTP_PASS", "") or ""
+        smtp["port"] = int(st.secrets.get("SMTP_PORT", 587))
+        smtp["from_name"] = st.secrets.get("SMTP_FROM_NAME", "English Pro AI") or "English Pro AI"
+    except Exception:
+        pass
+    # Fallback para config.py se st.secrets nao tiver
+    if not smtp["host"]:
+        smtp["host"] = config.SMTP_HOST
+    if not smtp["user"]:
+        smtp["user"] = config.SMTP_USER
+    if not smtp["password"]:
+        smtp["password"] = config.SMTP_PASS
+    return smtp
+
+
 def _is_smtp_configured() -> bool:
     """Verifica se SMTP esta realmente configurado (nao placeholder)."""
-    if not config.SMTP_HOST or not config.SMTP_USER:
+    smtp = _get_smtp_config()
+    if not smtp["host"] or not smtp["user"]:
         return False
-    # Detecta credenciais de placeholder
     placeholders = ["seu_email@gmail.com", "your_email@gmail.com", "you@example.com", ""]
-    if config.SMTP_USER.strip().lower() in placeholders:
+    if smtp["user"].strip().lower() in placeholders:
         return False
-    if not config.SMTP_PASS or config.SMTP_PASS.strip() in ["sua_senha_de_app", "your_app_password", ""]:
+    if not smtp["password"] or smtp["password"].strip() in ["sua_senha_de_app", "your_app_password", ""]:
         return False
     return True
 
