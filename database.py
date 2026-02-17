@@ -1,5 +1,5 @@
 from __future__ import annotations
-# database.py — Camada de banco de dados (SQLite)
+# database.py — Camada de banco de dados (SQLite local + Turso remoto)
 
 import sqlite3
 from datetime import datetime, timezone
@@ -7,29 +7,127 @@ from config import DB_PATH
 from typing import Optional, Any
 
 
+# ---------------------------------------------------------------------------
+# DictRow — wrapper p/ acessar resultados como row["coluna"] ou row[0]
+# ---------------------------------------------------------------------------
+class DictRow(dict):
+    """Permite acesso por nome (row['col']) e por indice (row[0])."""
+    def __init__(self, columns: list[str], values: tuple | list):
+        super().__init__(zip(columns, values))
+        self._values = list(values)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return super().__getitem__(key)
+
+    def keys(self):
+        return super().keys()
+
+
+# ---------------------------------------------------------------------------
+# TursoCursor — faz o resultado do libsql-client parecer um cursor sqlite3
+# ---------------------------------------------------------------------------
+class TursoCursor:
+    """Emula cursor sqlite3 a partir de um ResultSet do libsql-client."""
+    def __init__(self, result_set):
+        self._rs = result_set
+        self._rows = []
+        if result_set is not None and hasattr(result_set, 'rows'):
+            cols = list(result_set.columns) if hasattr(result_set, 'columns') else []
+            self._rows = [DictRow(cols, r) for r in result_set.rows]
+        self._index = 0
+        # Expor description pra compatibilidade
+        self.description = None
+
+    def fetchone(self):
+        if self._index < len(self._rows):
+            row = self._rows[self._index]
+            self._index += 1
+            return row
+        return None
+
+    def fetchall(self):
+        remaining = self._rows[self._index:]
+        self._index = len(self._rows)
+        return remaining
+
+    def __iter__(self):
+        return iter(self._rows)
+
+
+# ---------------------------------------------------------------------------
+# TursoConnection — wrapper que faz libsql-client parecer sqlite3.Connection
+# ---------------------------------------------------------------------------
+class TursoConnection:
+    """Adapta o ClientSync do libsql-client pra interface sqlite3."""
+    def __init__(self, client):
+        self._client = client
+        self._closed = False
+
+    def execute(self, sql: str, params=None) -> TursoCursor:
+        """Executa SQL e retorna TursoCursor."""
+        if params:
+            rs = self._client.execute(sql, list(params))
+        else:
+            rs = self._client.execute(sql)
+        return TursoCursor(rs)
+
+    def executescript(self, script: str):
+        """Executa multiplos statements separados por ';'."""
+        statements = [s.strip() for s in script.split(';') if s.strip()]
+        for stmt in statements:
+            self._client.execute(stmt)
+
+    def commit(self):
+        """No-op — libsql-client auto-commits."""
+        pass
+
+    def close(self):
+        """Fecha o client."""
+        if not self._closed:
+            try:
+                self._client.close()
+            except Exception:
+                pass
+            self._closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
+# ---------------------------------------------------------------------------
+# Flag global: True se estamos usando Turso
+# ---------------------------------------------------------------------------
+_using_turso = False
+
+
 def _get_conn():
-    """Retorna conexao com o banco (SQLite local ou Turso remoto)."""
+    """Retorna conexao com o banco (SQLite local ou Turso remoto via HTTP)."""
+    global _using_turso
     import config
-    
-    # Se tiver credenciais do Turso, conecta la
+
+    # Se tiver credenciais do Turso, conecta via libsql-client (HTTP)
     if config.TURSO_DB_URL and config.TURSO_AUTH_TOKEN:
         try:
-            import libsql_experimental as libsql
-            conn = libsql.connect(config.TURSO_DB_URL, auth_token=config.TURSO_AUTH_TOKEN)
-            # Compatibilidade row_factory
-            # Libsql experimental as vezes retorna tuple, vamos tentar forcar dict-like se possivel
-            # Mas por padrao ele nao tem row_factory igual sqlite3. 
-            # DICA: O proprio wrapper do libsql pode nao suportar row_factory assignment direto em versoes antigas
-            # Vamos assumir que funciona ou tratar no consumo. 
-            # UPDATE: Para manter compatibilidade com 'row["coluna"]', idealmente precisariamos de um wrapper
-            # mas vamos tentar usar o comportamento padrao.
-            return conn
+            from libsql_client import create_client_sync
+            url = config.TURSO_DB_URL
+            # Normalizar URL: libsql-client precisa de https:// ao inves de libsql://
+            if url.startswith("libsql://"):
+                url = url.replace("libsql://", "https://", 1)
+            client = create_client_sync(url, auth_token=config.TURSO_AUTH_TOKEN)
+            _using_turso = True
+            return TursoConnection(client)
         except ImportError:
-            print("AVISO: libsql-experimental nao instalado. Usando SQLite local.")
+            print("AVISO: libsql-client nao instalado. Usando SQLite local.")
         except Exception as e:
             print(f"ERRO DE CONEXAO TURSO: {e}. Usando SQLite local.")
 
     # Fallback SQLite Local
+    _using_turso = False
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -128,8 +226,12 @@ def create_user(username: str, name: str, password_hash: str) -> bool:
         )
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
-        return False
+    except (sqlite3.IntegrityError, Exception) as e:
+        # Turso pode lancar excecao diferente de sqlite3.IntegrityError
+        err_msg = str(e).lower()
+        if "unique" in err_msg or "constraint" in err_msg or isinstance(e, sqlite3.IntegrityError):
+            return False
+        raise  # Re-raise se nao for erro de unicidade
     finally:
         conn.close()
 
@@ -144,8 +246,11 @@ def create_user_with_email(username: str, name: str, password_hash: str, email: 
         )
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
-        return False
+    except (sqlite3.IntegrityError, Exception) as e:
+        err_msg = str(e).lower()
+        if "unique" in err_msg or "constraint" in err_msg or isinstance(e, sqlite3.IntegrityError):
+            return False
+        raise
     finally:
         conn.close()
 
