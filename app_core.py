@@ -41,6 +41,7 @@ st.set_page_config(
 
 # -- FUNCOES UTILITARIAS --
 
+@st.cache_data(show_spinner=False)
 def get_img_64(pasta: str, nome_arquivo: str) -> str:
     caminho = os.path.join(pasta, nome_arquivo)
     if os.path.exists(caminho):
@@ -49,6 +50,7 @@ def get_img_64(pasta: str, nome_arquivo: str) -> str:
     return ""
 
 
+@st.cache_data(show_spinner=False)
 def get_cover_img_64(nome_modulo: str) -> str:
     """Carrega imagem de capa salva localmente ou retorna vazio."""
     filename = f"{nome_modulo.lower()}.jpg"
@@ -1307,7 +1309,12 @@ elif st.session_state['pagina'] == 'selecao_modulos':
             salvar_progresso()
             st.rerun()
 
-    all_mod_progress = database.load_all_module_progress(username)
+    # OTIMIZACAO: Cache de progresso (TTL curto para nao ficar obsoleto, mas rapido no rerun)
+    @st.cache_data(ttl=5, show_spinner=False)
+    def _load_all_progress_cached(username_val):
+        return database.load_all_module_progress(username_val)
+
+    all_mod_progress = _load_all_progress_cached(username)
 
     # Grid Dinamico (3 Colunas para ficar mais largo e clean)
     for i in range(0, len(modulos), 3):
