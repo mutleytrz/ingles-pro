@@ -4,7 +4,7 @@ import database
 import config
 import streamlit_authenticator as stauth
 
-def render_admin_panel(username: str):
+def render_admin_panel(username: str, test_oral_callback=None):
     """Renderiza o painel ADM completo."""
     st.markdown("""
     <div style="background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.3); padding:20px; border-radius:12px; margin-bottom:30px;">
@@ -19,7 +19,7 @@ def render_admin_panel(username: str):
         _render_user_management(username)
 
     with tab2:
-        _render_tester_tools()
+        _render_tester_tools(test_oral_callback)
 
 
 def _render_user_management(current_admin_user: str):
@@ -125,7 +125,7 @@ def _reset_password_dialog(target_username: str):
         st.rerun()
 
 
-def _render_tester_tools():
+def _render_tester_tools(test_oral_callback=None):
     st.markdown("### God Mode")
     
     god_mode_active = st.session_state.get('god_mode', False)
@@ -138,6 +138,16 @@ def _render_tester_tools():
 
     st.divider()
     
+    st.divider()
+    
+    st.markdown("### 🧪 Ferramentas de Teste Rápido")
+    if test_oral_callback:
+        st.markdown("Teste a prova oral adaptativa usando o módulo atual (carregado na memória).")
+        if st.button("🎤 Iniciar Prova Oral Agora", type="primary", use_container_width=True):
+            test_oral_callback()
+            
+    st.divider()
+
     st.markdown("### Salto de Lição (Jump)")
     modulos = config.MODULOS
     mod_opts = [m[1] for m in modulos] # filenames

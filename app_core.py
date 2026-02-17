@@ -1158,22 +1158,27 @@ with st.sidebar:
              st.session_state['pagina'] = 'admin_panel'
              st.rerun()
         if st.button("🎤 Testar Prova Oral", use_container_width=True):
-             _arq = st.session_state.get('arquivo_atual', 'palavras.csv')
-             _banco = carregar_banco_especifico(_arq)
-             _mid = len(_banco) // 2
-             st.session_state['prova_modulo'] = _arq
-             st.session_state['prova_questoes'] = _build_test_questions(_banco, _mid, username)
-             st.session_state['prova_idx'] = 0
-             st.session_state['prova_acertos'] = 0
-             st.session_state['prova_total_palavras'] = 0
-             st.session_state['prova_tentativa'] = 0
-             st.session_state['pagina'] = 'prova_oral'
-             st.rerun()
+             _trigger_oral_test(username)
              
     st.markdown("---")
     auth.render_logout(location="sidebar")
 
 # -- FUNCOES UTILITARIAS: PROVA ORAL --
+def _trigger_oral_test(username):
+    """Inicia a prova oral imediatamente com o modulo atual."""
+    _arq = st.session_state.get('arquivo_atual', 'palavras.csv')
+    _banco = carregar_banco_especifico(_arq)
+    _mid = len(_banco) // 2
+    st.session_state['prova_modulo'] = _arq
+    st.session_state['prova_questoes'] = _build_test_questions(_banco, _mid, username)
+    st.session_state['prova_idx'] = 0
+    st.session_state['prova_acertos'] = 0
+    st.session_state['prova_total_palavras'] = 0
+    st.session_state['prova_tentativa'] = 0
+    st.session_state['pagina'] = 'prova_oral'
+    st.rerun()
+
+
 def _build_test_questions(banco, midpoint, username):
     """Seleciona 20 questoes adaptativas: prioriza palavras com mais erros + reforco cross-modulo."""
     weak = database.get_weak_words(username, limit=30)
@@ -1222,7 +1227,7 @@ elif st.session_state['pagina'] == 'admin_panel':
     if not is_admin:
         st.error("Acesso negado.")
     else:
-        admin_panel.render_admin_panel(username)
+        admin_panel.render_admin_panel(username, test_oral_callback=lambda: _trigger_oral_test(username))
         if st.button("⬅ Voltar ao App"):
             st.session_state['pagina'] = 'inicio'
             st.rerun()
