@@ -1166,6 +1166,11 @@ with st.sidebar:
 # -- FUNCOES UTILITARIAS: PROVA ORAL --
 def _trigger_oral_test(username):
     """Inicia a prova oral imediatamente com o modulo atual."""
+    # Security check: extra layer
+    if not database.is_user_admin(username):
+        st.error("Ação não autorizada.")
+        return
+
     _arq = st.session_state.get('arquivo_atual', 'palavras.csv')
     _banco = carregar_banco_especifico(_arq)
     _mid = len(_banco) // 2
