@@ -256,64 +256,6 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
             # except Exception:
             #     authenticator.login("main")
 
-            # DEBUG: Trace authentication status
-            st.write(f"DEBUG: Pre-login status: {st.session_state.get('authentication_status')}")
-            
-            # DEBUG: Inspect RAW Headers (The Truth)
-            try:
-                from streamlit.web.server.websocket_headers import _get_websocket_headers
-                headers = _get_websocket_headers()
-                if headers:
-                    cookie_header = headers.get("Cookie")
-                    if cookie_header:
-                        st.write(f"DEBUG: RAW 'Cookie' header received: {cookie_header[:20]}... (Len: {len(cookie_header)})")
-                        if "ingles_pro_session_v2" in cookie_header:
-                            st.write("DEBUG: ✅ 'ingles_pro_session_v2' found in raw headers!")
-                        else:
-                            st.write("DEBUG: ❌ 'ingles_pro_session_v2' NOT found in raw headers.")
-                    else:
-                        st.write("DEBUG: ❌ No 'Cookie' header received at all.")
-                else:
-                    st.write("DEBUG: Could not read websocket headers.")
-            except Exception as e:
-                st.write(f"DEBUG: Failed to read headers: {e}")
-                
-            # DEBUG: Inspect secrets loading (masked)
-            
-            # DEBUG: Inspect secrets loading (masked)
-            try:
-                secret_loaded = st.secrets.get("SECRET_KEY", None)
-                if secret_loaded:
-                    masked_secret = str(secret_loaded)[:4] + "..."
-                    st.write(f"DEBUG: SECRET_KEY loaded from secrets.toml: YES ({masked_secret})")
-                else:
-                    st.write("DEBUG: SECRET_KEY loaded from secrets.toml: NO (Using config backup)")
-            except Exception as e:
-                st.write(f"DEBUG: Failed to read secrets: {e}")
-
-            # DEBUG: Inspect Cookies (Streamlit 1.30+ feature if available)
-            try:
-                # Tentativa de ler cookies diretamente dos headers/contexto
-                # Nota: st.context.cookies está disponível apenas em versões recentes
-                if hasattr(st, "context") and hasattr(st.context, "cookies"):
-                    all_cookies = st.context.cookies
-                    st.write(f"DEBUG: Browser Cookies Found: {list(all_cookies.keys())}")
-                    if "ingles_pro_session_v2" in all_cookies:
-                         st.write(f"DEBUG: Session Cookie Value (masked): {str(all_cookies['ingles_pro_session_v2'])[:10]}...")
-                    else:
-                         st.write("DEBUG: Session Cookie NOT found in browser request.")
-                else:
-                     st.write("DEBUG: st.context.cookies not available in this Streamlit version.")
-            except Exception as e:
-                st.write(f"DEBUG: Error inspecting cookies: {e}")
-            
-            if st.session_state.get("authentication_status") is None:
-                 st.write("DEBUG: Status is None. Form should be visible.")
-            elif st.session_state.get("authentication_status") is False:
-                 st.write("DEBUG: Status is False. Login failed.")
-            else:
-                 st.write(f"DEBUG: Status is {st.session_state.get('authentication_status')}. User: {st.session_state.get('username')}")
-
             # ------------------------------------------------------------------
             # CRITICAL FIX: FORCE SESSION CLEANUP IF NOT AUTHENTICATED
             # ------------------------------------------------------------------
@@ -333,11 +275,9 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                     st.session_state["_authenticator"] = authenticator
                     
                     # ------------------------------------------------------------------
-                    # CRITICAL FIX: MANUAL COOKIE SETTER (Backup for localhost/HTTP)
+                    # CRITICAL FIX: MANUAL COOKIE SETTER (ROBUST MODE)
                     # ------------------------------------------------------------------
-                    # Se o login foi sucesso, força a gravação do cookie via JS puro
-                    # para garantir que o navegador salve mesmo sem HTTPS.
-                    # Tentamos pegar o token do controller de cookies do authenticator.
+                    # Força a gravação do cookie via JS com atributos corretos para iframes/cloud
                     try:
                         token = None
                         if hasattr(authenticator, 'cookie_handler'):
@@ -346,20 +286,35 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                              token = authenticator.token
                         
                         if token:
-                            # Define o cookie via JS com SameSite=Lax (funciona em localhost)
+                            # Define o cookie via JS com SameSite=None; Secure (Obrigatório para iframes/Cloud)
+                            # E também define a versão legacy (sem SameSite) para compatibilidade
                             js_cookie = f"""
                             <script>
-                                document.cookie = "{authenticator.cookie_name}={token}; path=/; max-age={authenticator.cookie_expiry_days * 24 * 3600}; SameSite=Lax";
-                                console.log("✅ EnglishPro: Manual fallback cookie set!");
+                                function setCookie(name, value, days) {{
+                                    var expires = "";
+                                    if (days) {{
+                                        var date = new Date();
+                                        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                                        expires = "; expires=" + date.toUTCString();
+                                    }}
+                                    // Cookie Moderno (Partitioned / Cross-site)
+                                    document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=None; Secure";
+                                    // Backup Legacy
+                                    document.cookie = name + "_legacy=" + (value || "") + expires + "; path=/; Secure";
+                                    console.log("✅ EnglishPro: Auth Cookies set successfully!");
+                                }}
+                                setCookie("{authenticator.cookie_name}", "{token}", {authenticator.cookie_expiry_days});
                             </script>
                             """
                             # Injeta o JS invisivelmente
                             st.markdown(js_cookie, unsafe_allow_html=True)
-                            st.write(f"DEBUG: Manual JS Cookie Injection attempted for token: {token[:10]}...")
+                            
+                            # Pequeno delay para garantir que o navegador processe antes de qualquer reload
+                            # time.sleep(0.5) 
                         else:
-                            st.write("DEBUG: Could not find auth token for manual cookie set.")
+                            print("DEBUG: Could not find auth token for manual cookie set.")
                     except Exception as e:
-                        st.write(f"DEBUG: Manual cookie set failed: {e}")
+                        print(f"DEBUG: Manual cookie set failed: {e}")
                     # ------------------------------------------------------------------
 
                     return username_logged
