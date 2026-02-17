@@ -24,7 +24,7 @@ def _build_authenticator():
 
     authenticator = stauth.Authenticate(
         credentials={"usernames": creds["usernames"]},
-        cookie_name="ingles_pro_cookie",
+        cookie_name="ingles_pro_session_v2",
         cookie_key=cookie_secret,
         cookie_expiry_days=30,
         auto_hash=False,

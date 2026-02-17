@@ -57,6 +57,11 @@ def _render_user_management(current_admin_user: str):
              if new_xp != current_xp:
                  if st.button("💾", key=f"save_xp_{u['username']}"):
                      database.update_user_xp(u['username'], int(new_xp))
+                     # FIX: Se estiver editando a si mesmo, atualiza a sessao imediatamente
+                     # caso contrario, o proximo salvar_progresso() vai sobrescrever o banco com o valor antigo
+                     if is_self:
+                        st.session_state['xp'] = int(new_xp)
+                     
                      st.toast(f"XP de {u['username']} atualizado!")
                      st.rerun()
 

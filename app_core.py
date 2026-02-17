@@ -89,16 +89,38 @@ def aplicar_estilo() -> None:
 
 
     /* ============================================
-       GLOBAL SETTINGS & COSMIC BACKGROUND
+       GLOBAL SETTINGS & COSMIC BACKGROUND (PREMIUM STATIC)
        ============================================ */
     .stApp {
-        background: radial-gradient(circle at center, #1a1a2e 0%, #0f0a28 100%);
+        background-color: #030014;
+        background-image:
+            radial-gradient(ellipse at 10% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+            radial-gradient(ellipse at 90% 80%, rgba(6, 182, 212, 0.12) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 50%, rgba(236, 72, 153, 0.08) 0%, transparent 60%),
+            radial-gradient(circle at 30% 70%, rgba(59, 130, 246, 0.06) 0%, transparent 40%),
+            radial-gradient(circle at 70% 30%, rgba(245, 158, 11, 0.05) 0%, transparent 40%);
+        background-size: 200% 200%;
         color: #e2e8f0;
         font-family: 'Outfit', sans-serif;
         min-height: 100vh;
     }
     .stApp::before {
-        display: none;
+        content: '';
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background:
+            radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.15), transparent),
+            radial-gradient(2px 2px at 40% 70%, rgba(255,255,255,0.1), transparent),
+            radial-gradient(1px 1px at 60% 20%, rgba(255,255,255,0.12), transparent),
+            radial-gradient(2px 2px at 80% 50%, rgba(255,255,255,0.08), transparent),
+            radial-gradient(1px 1px at 10% 80%, rgba(139,92,246,0.2), transparent),
+            radial-gradient(1px 1px at 90% 10%, rgba(6,182,212,0.2), transparent),
+            radial-gradient(1px 1px at 50% 90%, rgba(236,72,153,0.15), transparent),
+            radial-gradient(1.5px 1.5px at 25% 55%, rgba(255,255,255,0.1), transparent),
+            radial-gradient(1px 1px at 75% 45%, rgba(255,255,255,0.08), transparent),
+            radial-gradient(1.5px 1.5px at 15% 10%, rgba(255,255,255,0.12), transparent),
+            radial-gradient(1px 1px at 65% 85%, rgba(255,255,255,0.06), transparent),
+            radial-gradient(2px 2px at 45% 40%, rgba(255,255,255,0.07), transparent);
+        pointer-events: none; z-index: 0;
     }
 
     header[data-testid="stHeader"], footer { display: none !important; }
