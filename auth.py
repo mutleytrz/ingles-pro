@@ -440,9 +440,11 @@ def render_logout(location="sidebar"):
     else:
         if authenticator is not None:
             try:
+                # O metodo logout do authenticator retorna True se o usuario clicou em sair
+                # Mas precisamos garantir que ele limpe a URL
                 if authenticator.logout("ENCERRAR SESSÃO", location=location):
-                    # Se clicou em sair, limpa URL tambem
                     st.query_params.clear()
+                    st.rerun()
             except Exception:
                 pass
 
