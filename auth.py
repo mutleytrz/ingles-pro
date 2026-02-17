@@ -243,18 +243,29 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
     
     with c_main:
         if authenticator is not None:
-            try:
-                authenticator.login(
-                    location="main",
-                    fields={
-                        "Form name": "🔐 Acessar Plataforma",
-                        "Username": "Usuário",
-                        "Password": "Senha",
-                        "Login": "ENTRAR NO SISTEMA",
-                    },
-                )
-            except Exception:
-                authenticator.login("main")
+            # try:
+            authenticator.login(
+                location="main",
+                fields={
+                    "Form name": "🔐 Acessar Plataforma",
+                    "Username": "Usuário",
+                    "Password": "Senha",
+                    "Login": "ENTRAR NO SISTEMA",
+                },
+            )
+            # except Exception:
+            #     authenticator.login("main")
+
+            # DEBUG: Trace authentication status
+            st.write(f"DEBUG: Pre-login status: {st.session_state.get('authentication_status')}")
+            # st.write(f"DEBUG: Cookie: {authenticator.cookie_handler.get_cookie()}") # Only if available in this version
+            
+            if st.session_state.get("authentication_status") is None:
+                 st.write("DEBUG: Status is None. Form should be visible.")
+            elif st.session_state.get("authentication_status") is False:
+                 st.write("DEBUG: Status is False. Login failed.")
+            else:
+                 st.write(f"DEBUG: Status is {st.session_state.get('authentication_status')}. User: {st.session_state.get('username')}")
 
             # ------------------------------------------------------------------
             # CRITICAL FIX: FORCE SESSION CLEANUP IF NOT AUTHENTICATED
