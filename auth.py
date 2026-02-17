@@ -255,7 +255,9 @@ def render_login() -> Optional[str]:
     # Verifica se o usuario clicou em sair ANTES de qualquer logica de login
     if st.session_state.get("logout_btn_main") or st.session_state.get("logout_btn_sidebar"):
         st.query_params.clear()
-        return None
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
     # Se nao esta logado, checa se tem token na URL
     if st.session_state.get("authentication_status") is not True:
