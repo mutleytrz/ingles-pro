@@ -31,6 +31,19 @@ def _generate_code() -> str:
     return str(random.randint(100000, 999999))
 
 
+def _is_smtp_configured() -> bool:
+    """Verifica se SMTP esta realmente configurado (nao placeholder)."""
+    if not config.SMTP_HOST or not config.SMTP_USER:
+        return False
+    # Detecta credenciais de placeholder
+    placeholders = ["seu_email@gmail.com", "your_email@gmail.com", "you@example.com", ""]
+    if config.SMTP_USER.strip().lower() in placeholders:
+        return False
+    if not config.SMTP_PASS or config.SMTP_PASS.strip() in ["sua_senha_de_app", "your_app_password", ""]:
+        return False
+    return True
+
+
 def render_email_verification(username: str):
     """Tela de verificacao de codigo."""
     
@@ -103,8 +116,8 @@ def render_register():
         submitted = st.form_submit_button("🚀 CRIAR CONTA", use_container_width=True)
 
     if submitted:
-        if not new_user or not new_name or not new_pass or not new_email:
-            st.error("⚠️ Preencha todos os campos.")
+        if not new_user or not new_name or not new_pass:
+            st.error("⚠️ Preencha todos os campos obrigatórios (Usuário, Nome, Senha).")
             return
         if new_pass != new_pass2:
             st.error("⚠️ As senhas não coincidem.")
@@ -114,35 +127,33 @@ def render_register():
             return
 
         hashed = stauth.Hasher().hash(new_pass)
-        verification_code = _generate_code()
         
-        ok = database.create_user_with_email(new_user, new_name, hashed, new_email, verification_code)
-        if ok:
-            # Invalida cache do authenticator
-            if "_authenticator_instance" in st.session_state:
-                del st.session_state["_authenticator_instance"]
-                
-            # Tenta enviar email
-            sent = email_service.send_verification_email(new_email, verification_code)
-            
-            if sent:
-                st.session_state["pending_verification_user"] = new_user
-                
-                # UX MELHORADA: Se estiver em MODO DEV (sem SMTP), mostra o codigo na tela
-                if not config.SMTP_HOST or not config.SMTP_USER:
-                    st.info(f"🔧 MODO DEV (Sem Email): Seu código é **{verification_code}**")
-                else:
+        if _is_smtp_configured() and new_email:
+            # MODO PRODUCAO: cadastro com verificacao de email
+            verification_code = _generate_code()
+            ok = database.create_user_with_email(new_user, new_name, hashed, new_email, verification_code)
+            if ok:
+                if "_authenticator_instance" in st.session_state:
+                    del st.session_state["_authenticator_instance"]
+                sent = email_service.send_verification_email(new_email, verification_code)
+                if sent:
+                    st.session_state["pending_verification_user"] = new_user
                     st.success(f"✅ Conta criada! Enviamos um código para {new_email}.")
-                
-                # Pequeno delay para ler antes de dar rerun? 
-                # Nao, o rerun limpa a tela. O st.info vai sumir.
-                # Precisamos persistir a mensagem ou mostrar na TELA DE VERIFICACAO.
-                st.rerun()
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Conta criada, mas falha ao enviar email.")
             else:
-                st.warning("⚠️ Conta criada, mas falha ao enviar email. Contate o admin ou configure o SMTP.")
-                st.success("Conta criada.")
+                st.error(f"❌ Usuário '{new_user}' já existe.")
         else:
-            st.error(f"❌ Usuário '{new_user}' já existe.")
+            # MODO SEM EMAIL: cadastro direto, sem verificacao
+            ok = database.create_user(new_user, new_name, hashed)
+            if ok:
+                if "_authenticator_instance" in st.session_state:
+                    del st.session_state["_authenticator_instance"]
+                st.success("✅ Conta criada com sucesso! Agora faça login acima.")
+                st.balloons()
+            else:
+                st.error(f"❌ Usuário '{new_user}' já existe.")
 
 
 def render_login() -> Optional[str]:

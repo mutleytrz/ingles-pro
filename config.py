@@ -19,9 +19,27 @@ def _load_config_file() -> dict[str, Any]:
 _file_cfg: dict[str, Any] = _load_config_file()
 
 
+def _get_streamlit_secret(key: str):
+    """Tenta ler de st.secrets (Streamlit Cloud)."""
+    try:
+        import streamlit as st
+        return st.secrets.get(key, None)
+    except Exception:
+        return None
+
+
 def _get(key: str, default: str = "") -> str:
-    """Prioridade: variavel de ambiente > config.json > default."""
-    return os.environ.get(key, _file_cfg.get(key, default))
+    """Prioridade: variavel de ambiente > st.secrets > config.json > default."""
+    # 1. Variavel de ambiente
+    env_val = os.environ.get(key)
+    if env_val is not None:
+        return env_val
+    # 2. Streamlit Cloud secrets
+    secret_val = _get_streamlit_secret(key)
+    if secret_val is not None:
+        return str(secret_val)
+    # 3. config.json
+    return _file_cfg.get(key, default)
 
 
 # -- Diretorio raiz dos dados (pode ser /mnt/dados na VPS) --
