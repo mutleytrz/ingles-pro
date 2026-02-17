@@ -331,6 +331,37 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
                 
                 if database.is_email_verified(username_logged):
                     st.session_state["_authenticator"] = authenticator
+                    
+                    # ------------------------------------------------------------------
+                    # CRITICAL FIX: MANUAL COOKIE SETTER (Backup for localhost/HTTP)
+                    # ------------------------------------------------------------------
+                    # Se o login foi sucesso, força a gravação do cookie via JS puro
+                    # para garantir que o navegador salve mesmo sem HTTPS.
+                    # Tentamos pegar o token do controller de cookies do authenticator.
+                    try:
+                        token = None
+                        if hasattr(authenticator, 'cookie_handler'):
+                             token = authenticator.cookie_handler.token
+                        elif hasattr(authenticator, 'token'):
+                             token = authenticator.token
+                        
+                        if token:
+                            # Define o cookie via JS com SameSite=Lax (funciona em localhost)
+                            js_cookie = f"""
+                            <script>
+                                document.cookie = "{authenticator.cookie_name}={token}; path=/; max-age={authenticator.cookie_expiry_days * 24 * 3600}; SameSite=Lax";
+                                console.log("✅ EnglishPro: Manual fallback cookie set!");
+                            </script>
+                            """
+                            # Injeta o JS invisivelmente
+                            st.markdown(js_cookie, unsafe_allow_html=True)
+                            st.write(f"DEBUG: Manual JS Cookie Injection attempted for token: {token[:10]}...")
+                        else:
+                            st.write("DEBUG: Could not find auth token for manual cookie set.")
+                    except Exception as e:
+                        st.write(f"DEBUG: Manual cookie set failed: {e}")
+                    # ------------------------------------------------------------------
+
                     return username_logged
                 else:
                     # Nao verificado -> gera novo codigo e reenvia email
