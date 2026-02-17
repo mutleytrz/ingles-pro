@@ -71,127 +71,34 @@ def _get_xp_tier(xp: int) -> tuple[str, str, str]:
 def aplicar_estilo() -> None:
     # DESIGN: "COSMIC ACADEMY" — Premium Futuristic Design
     st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
-
     /* ============================================
-       KEYFRAME ANIMATIONS
+       STATIC STYLING (PERFORMANCE OPTIMIZED)
        ============================================ */
-    @keyframes cosmicDrift {
-        0% { background-position: 0% 0%; }
-        50% { background-position: 100% 100%; }
-        100% { background-position: 0% 0%; }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
-    @keyframes neonPulse {
-        0%, 100% { box-shadow: 0 0 5px rgba(139, 92, 246, 0.4), 0 0 20px rgba(139, 92, 246, 0.15); }
-        50% { box-shadow: 0 0 25px rgba(139, 92, 246, 0.6), 0 0 60px rgba(139, 92, 246, 0.25); }
-    }
-    @keyframes glowPulse {
-        0%, 100% { opacity: 0.6; }
-        50% { opacity: 1; }
-    }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(30px); }
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
     }
-    @keyframes fadeInScale {
-        from { opacity: 0; transform: scale(0.92); }
-        to { opacity: 1; transform: scale(1); }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
     }
-    @keyframes slideInRight {
-        from { opacity: 0; transform: translateX(40px); }
-        to { opacity: 1; transform: translateX(0); }
-    }
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-    }
-    @keyframes wordPop {
-        0% { opacity: 0; transform: scale(0.4) translateY(15px); }
-        70% { transform: scale(1.15); }
-        100% { opacity: 1; transform: scale(1) translateY(0); }
-    }
-    @keyframes shimmer {
-        0% { background-position: -200% center; }
-        100% { background-position: 200% center; }
-    }
-    @keyframes borderGlow {
-        0%, 100% { border-color: rgba(139, 92, 246, 0.3); }
-        50% { border-color: rgba(6, 182, 212, 0.5); }
-    }
-    @keyframes particleFloat1 {
-        0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
-        25% { transform: translate(100px, -200px) scale(1.5); opacity: 0.6; }
-        50% { transform: translate(-50px, -350px) scale(0.8); opacity: 0.2; }
-        75% { transform: translate(150px, -150px) scale(1.2); opacity: 0.5; }
-    }
-    @keyframes particleFloat2 {
-        0%, 100% { transform: translate(0, 0) scale(0.8); opacity: 0.2; }
-        33% { transform: translate(-120px, -250px) scale(1.3); opacity: 0.5; }
-        66% { transform: translate(80px, -400px) scale(0.6); opacity: 0.3; }
-    }
-    @keyframes textGradient {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-    @keyframes cardEntrance {
-        from { opacity: 0; transform: translateY(40px) scale(0.95); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    @keyframes progressGlow {
-        0%, 100% { box-shadow: 0 0 8px rgba(139, 92, 246, 0.4); }
-        50% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.6); }
-    }
-    @keyframes xpBounce {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.08); }
-    }
-    @keyframes ringPulse {
-        0% { transform: scale(0.8); opacity: 0.8; }
-        100% { transform: scale(1.6); opacity: 0; }
-    }
-    @keyframes bounceIn {
-        0% { opacity: 0; transform: scale(0.3); }
-        50% { opacity: 1; transform: scale(1.15); }
-        70% { transform: scale(0.9); }
-        100% { opacity: 1; transform: scale(1); }
-    }
+
 
     /* ============================================
        GLOBAL SETTINGS & COSMIC BACKGROUND
        ============================================ */
     .stApp {
-        background-color: #030014;
-        background-image:
-            radial-gradient(ellipse at 10% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-            radial-gradient(ellipse at 90% 80%, rgba(6, 182, 212, 0.12) 0%, transparent 50%),
-            radial-gradient(ellipse at 50% 50%, rgba(236, 72, 153, 0.08) 0%, transparent 60%),
-            radial-gradient(circle at 30% 70%, rgba(59, 130, 246, 0.06) 0%, transparent 40%),
-            radial-gradient(circle at 70% 30%, rgba(245, 158, 11, 0.05) 0%, transparent 40%);
-        background-size: 200% 200%;
-        animation: cosmicDrift 30s ease infinite;
+        background: radial-gradient(circle at center, #1a1a2e 0%, #0f0a28 100%);
         color: #e2e8f0;
         font-family: 'Outfit', sans-serif;
         min-height: 100vh;
     }
     .stApp::before {
-        content: '';
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background:
-            radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.15), transparent),
-            radial-gradient(2px 2px at 40% 70%, rgba(255,255,255,0.1), transparent),
-            radial-gradient(1px 1px at 60% 20%, rgba(255,255,255,0.12), transparent),
-            radial-gradient(2px 2px at 80% 50%, rgba(255,255,255,0.08), transparent),
-            radial-gradient(1px 1px at 10% 80%, rgba(139,92,246,0.2), transparent),
-            radial-gradient(1px 1px at 90% 10%, rgba(6,182,212,0.2), transparent),
-            radial-gradient(1px 1px at 50% 90%, rgba(236,72,153,0.15), transparent),
-            radial-gradient(1.5px 1.5px at 25% 55%, rgba(255,255,255,0.1), transparent),
-            radial-gradient(1px 1px at 75% 45%, rgba(255,255,255,0.08), transparent),
-            radial-gradient(1.5px 1.5px at 15% 10%, rgba(255,255,255,0.12), transparent),
-            radial-gradient(1px 1px at 65% 85%, rgba(255,255,255,0.06), transparent),
-            radial-gradient(2px 2px at 45% 40%, rgba(255,255,255,0.07), transparent);
-        pointer-events: none; z-index: 0;
+        display: none;
     }
 
     header[data-testid="stHeader"], footer { display: none !important; }
@@ -218,11 +125,8 @@ def aplicar_estilo() -> None:
         border: 1px solid rgba(139, 92, 246, 0.2);
         border-radius: 28px;
         padding: 44px;
-        box-shadow:
-            0 30px 60px -15px rgba(0, 0, 0, 0.6),
-            0 0 40px rgba(139, 92, 246, 0.08),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05);
-        animation: fadeInScale 0.7s ease-out;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        /* animation: fadeInScale 0.7s ease-out; REMOVED */
     }
     [data-testid="stTextInput"] input {
         background: rgba(3, 0, 20, 0.6) !important;
@@ -298,7 +202,7 @@ def aplicar_estilo() -> None:
             0 8px 32px rgba(0,0,0,0.3),
             0 0 20px rgba(139, 92, 246, 0.05),
             inset 0 1px 0 rgba(255,255,255,0.04);
-        animation: fadeInUp 0.5s ease-out;
+        /* animation: fadeInUp 0.5s ease-out; REMOVED */
     }
     .app-logo {
         font-size: 22px; font-weight: 900; color: #f8fafc;
@@ -321,7 +225,7 @@ def aplicar_estilo() -> None:
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         color: #fff; font-weight: 800; font-size: 13px; padding: 7px 16px; border-radius: 99px;
         box-shadow: 0 3px 12px rgba(245, 158, 11, 0.4);
-        animation: xpBounce 2s ease-in-out infinite;
+        /* animation: xpBounce 2s ease-in-out infinite; REMOVED */
         font-family: 'Outfit', sans-serif;
     }
     .xp-count {
@@ -331,7 +235,7 @@ def aplicar_estilo() -> None:
     .xp-tier-badge {
         font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 12px;
         padding: 5px 14px; border-radius: 99px;
-        animation: glowPulse 3s ease-in-out infinite;
+        /* animation: glowPulse 3s ease-in-out infinite; REMOVED */
     }
 
     /* ============================================
@@ -345,7 +249,7 @@ def aplicar_estilo() -> None:
         font-size: 12px; font-weight: 700; letter-spacing: 2px;
         color: #c4b5fd; text-transform: uppercase;
         font-family: 'Outfit', sans-serif;
-        animation: glowPulse 3s ease-in-out infinite;
+        /* animation: glowPulse 3s ease-in-out infinite; REMOVED */
     }
     .hero-title {
         font-size: 56px !important; font-weight: 900 !important;
@@ -356,7 +260,7 @@ def aplicar_estilo() -> None:
         background: linear-gradient(135deg, #8b5cf6, #06b6d4, #ec4899, #f59e0b);
         background-size: 300% 300%;
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        animation: textGradient 4s ease infinite;
+        /* animation: textGradient 4s ease infinite; REMOVED */
     }
     .hero-subtitle {
         font-size: 18px !important; color: #94a3b8 !important;
@@ -376,7 +280,7 @@ def aplicar_estilo() -> None:
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
-        animation: cardEntrance 0.6s ease-out backwards;
+        /* animation: cardEntrance 0.6s ease-out backwards; REMOVED */
     }
     .feature-card::before {
         content: '';
@@ -396,7 +300,7 @@ def aplicar_estilo() -> None:
         border-radius: 18px; display: flex; align-items: center; justify-content: center;
         font-size: 28px; margin-bottom: 20px;
         border: 1px solid rgba(139, 92, 246, 0.1);
-        animation: float 4s ease-in-out infinite;
+        /* animation: float 4s ease-in-out infinite; REMOVED */
     }
     .card-title {
         font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 700;
@@ -413,7 +317,7 @@ def aplicar_estilo() -> None:
         perspective: 1200px;
         height: 100%;
         margin-bottom: 28px;
-        animation: cardEntrance 0.6s ease-out backwards;
+        /* animation: cardEntrance 0.6s ease-out backwards; REMOVED */
     }
     .module-card-inner {
         background: rgba(15, 10, 40, 0.55);
@@ -488,7 +392,7 @@ def aplicar_estilo() -> None:
         background-size: 200% 100%;
         border-radius: 4px;
         transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        animation: progressGlow 2s ease-in-out infinite;
+        /* animation: progressGlow 2s ease-in-out infinite; REMOVED */
         box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
     }
     .mod-meta {
@@ -521,7 +425,7 @@ def aplicar_estilo() -> None:
             0 0 30px rgba(139, 92, 246, 0.05);
         position: relative;
         display: flex; align-items: center; justify-content: center;
-        animation: slideInRight 0.6s ease-out;
+        /* animation: slideInRight 0.6s ease-out; REMOVED */
     }
     .img-premium-wrap::after {
         content: '';
@@ -549,7 +453,7 @@ def aplicar_estilo() -> None:
         position: relative;
         min-height: 300px;
         display: flex; flex-direction: column; justify-content: center; align-items: center;
-        animation: fadeInUp 0.5s ease-out;
+        /* animation: fadeInUp 0.5s ease-out; REMOVED */
         box-shadow: 0 15px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
         overflow: hidden;
     }
@@ -578,7 +482,7 @@ def aplicar_estilo() -> None:
     .fb-word {
         padding: 10px 20px; border-radius: 14px; font-weight: 700; font-size: 17px;
         font-family: 'Outfit', sans-serif;
-        animation: wordPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
+        /* animation: wordPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards; REMOVED */
     }
     .fb-correct {
         background: rgba(16, 185, 129, 0.12);
@@ -602,7 +506,7 @@ def aplicar_estilo() -> None:
         border-radius: 16px;
         padding: 18px 22px;
         margin: 16px 0;
-        animation: fadeInUp 0.4s ease-out;
+        /* animation: fadeInUp 0.4s ease-out; REMOVED */
     }
     .ouvi-label {
         font-size: 11px; font-weight: 700; letter-spacing: 2px;
@@ -626,7 +530,7 @@ def aplicar_estilo() -> None:
         background: linear-gradient(135deg, #34d399 0%, #06b6d4 50%, #8b5cf6 100%);
         background-size: 200% 200%;
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        animation: textGradient 3s ease infinite;
+        /* animation: textGradient 3s ease infinite; REMOVED */
     }
     .result-pct.fail {
         color: #f43f5e;
@@ -656,7 +560,7 @@ def aplicar_estilo() -> None:
         border-radius: 5px;
         transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 0 14px rgba(139, 92, 246, 0.5);
-        animation: shimmer 2s linear infinite;
+        /* animation: shimmer 2s linear infinite; REMOVED */
     }
     .lesson-header {
         font-family: 'Outfit', sans-serif;
@@ -696,7 +600,7 @@ def aplicar_estilo() -> None:
         border-radius: 28px; padding: 48px; text-align: center;
         margin-bottom: 44px;
         box-shadow: 0 0 50px rgba(139, 92, 246, 0.1), 0 20px 40px rgba(0,0,0,0.3);
-        animation: fadeInScale 0.7s ease-out;
+        /* animation: fadeInScale 0.7s ease-out; REMOVED */
         position: relative; overflow: hidden;
     }
     .metric-hero::before {
@@ -756,7 +660,7 @@ def aplicar_estilo() -> None:
         padding: 5px 16px; border-radius: 99px;
         font-size: 11px; font-weight: 700; letter-spacing: 2px;
         font-family: 'Outfit', sans-serif;
-        animation: glowPulse 3s ease infinite;
+        /* animation: glowPulse 3s ease infinite; REMOVED */
     }
 
     /* ============================================
@@ -837,7 +741,6 @@ def aplicar_estilo() -> None:
             radial-gradient(ellipse at 20% 50%, rgba(139, 92, 246, 0.2) 0%, transparent 50%),
             radial-gradient(ellipse at 80% 50%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
             radial-gradient(ellipse at 50% 20%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
-        animation: cosmicDrift 20s ease infinite;
         background-size: 200% 200%;
         pointer-events: none;
         z-index: 0;
@@ -911,7 +814,7 @@ def aplicar_estilo() -> None:
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
-        animation: cardEntrance 0.6s ease-out backwards;
+        /* animation: cardEntrance 0.6s ease-out backwards; REMOVED */
         cursor: pointer;
     }
     .ft-card:hover {
@@ -933,7 +836,7 @@ def aplicar_estilo() -> None:
         border: 1.5px solid var(--ft-border, rgba(139, 92, 246, 0.2));
         display: flex; align-items: center; justify-content: center;
         font-size: 32px;
-        animation: float 5s ease-in-out infinite;
+        /* animation: float 5s ease-in-out infinite; REMOVED */
     }
     .ft-content { flex: 1; }
     .ft-title {
@@ -1062,11 +965,14 @@ if st.session_state['logged_in_user'] != username:
     # Detected user switch or fresh login
     st.session_state['logged_in_user'] = username
     
-    # 1. Clear critical session keys
+    # 1. Clear critical session keys - FIX: Only if not matching expected structure
+    # This prevents accidental wipe on reload
     keys_to_reset = ['xp', 'indice', 'porc_atual', 'tentativa', 'pagina', 'arquivo_atual', '_progresso_carregado']
-    for k in keys_to_reset:
-        if k in st.session_state:
-            del st.session_state[k]
+    if st.session_state['logged_in_user'] is not None:
+         # Only reset if we are definitely switching users (e.g. None -> User or User A -> User B)
+        for k in keys_to_reset:
+            if k in st.session_state:
+                del st.session_state[k]
             
     # 2. Re-apply defaults for safety
     dt_defaults = {
@@ -1077,8 +983,9 @@ if st.session_state['logged_in_user'] != username:
     for k, v in dt_defaults.items():
         st.session_state[k] = v
         
-    # 3. Force rerun to load fresh data
-    st.rerun()
+    # 3. Force rerun removed to avoid infinite reload loops on some systems
+    # st.rerun()  <-- REMOVED to improve stability
+    pass
 if username is None:
     st.stop()
 
@@ -1531,9 +1438,11 @@ elif st.session_state['pagina'] == 'aula':
         if img_src:
             st.markdown(f"""<div class="img-premium-wrap" style="position:relative; padding:0; line-height:0;">{badge_html}<img src="{img_src}" style="width:100%; display:block; border-radius:12px;"></div>""", unsafe_allow_html=True)
         else:
-            st.warning("Imagem não encontrada")
-
-
+            # DEBUG: Se nao achou imagem, mostra warning com info
+            st.warning(f"Imagem não encontrada. ID: {atual.get('id')} | URL: {atual.get('img')}")
+            # Tenta mostrar o que tem no 'img' cru, caso seja util
+            if atual.get('img'):
+                st.write(f"Source URL: {atual.get('img')}")
 
     with col_txt:
         # Box da Frase — Centered & Premium (Com Bandeiras e Texto Maior)
