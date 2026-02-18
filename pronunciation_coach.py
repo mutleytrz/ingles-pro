@@ -487,22 +487,24 @@ def render_pronunciation_coach(username: str):
 }}
 .speech-bubble {{
     position: absolute;
-    top: -10px;
+    top: -20px;
     right: 50%;
-    transform: translateX(160%);
+    transform: translateX(155%);
     background: #fff;
     color: #0f172a;
-    padding: 12px 20px;
-    border-radius: 16px;
-    font-size: 16px;
+    padding: 18px 28px;
+    border-radius: 24px;
+    font-size: 19px;
     font-weight: 700;
     white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    max-width: 250px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    max-width: 400px;
+    min-width: 200px;
     white-space: normal;
     text-align: center;
-    border: 2px solid #22d3ee;
+    border: 3px solid #22d3ee;
     z-index: 20;
+    line-height: 1.4;
 }}
 .speech-bubble::after {{
     content: '';
