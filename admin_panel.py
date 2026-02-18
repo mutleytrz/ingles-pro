@@ -59,6 +59,17 @@ def _render_user_management(current_admin_user: str):
         st.info("Nenhum usuário encontrado.")
         return
 
+    # --- SUMMARY METRICS ---
+    total_users = len(users)
+    premium_count = sum(1 for u in users if u.get('is_premium'))
+    trial_count = total_users - premium_count
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total de Alunos", total_users)
+    m2.metric("👑 Membros Premium", premium_count, delta=f"+{premium_count}" if premium_count > 0 else None, delta_color="normal")
+    m3.metric("🧪 Contas de Teste", trial_count)
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # Table Header
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 2, 2, 2, 1, 2, 2])
     c1.markdown("**ID**")
@@ -93,10 +104,26 @@ def _render_user_management(current_admin_user: str):
 
         # Plan Info
         with c6:
+            is_prem = bool(u.get('is_premium', 0))
             p_type = u.get('plan_type', 'free').upper()
             until = u.get('premium_until')
-            color = "#22c55e" if u['is_premium'] else "#94a3b8"
-            st.markdown(f"<span style='color:{color}; font-weight:bold;'>{p_type}</span>", unsafe_allow_html=True)
+            
+            if is_prem:
+                color = "#fbbf24" # Gold
+                icon = "👑"
+                badge_bg = "rgba(245,158,11,0.1)"
+            else:
+                color = "#94a3b8" # Slate
+                icon = "🧪"
+                badge_bg = "rgba(148,163,184,0.1)"
+            
+            st.markdown(f"""
+                <div style="background:{badge_bg}; border:1px solid {color}33; padding:4px 10px; border-radius:8px; display:inline-block;">
+                    <span style="font-size:12px; margin-right:5px;">{icon}</span>
+                    <span style="color:{color}; font-weight:bold; font-size:12px;">{p_type}</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
             if until:
                 st.caption(f"Expira: {until[:10]}")
 
