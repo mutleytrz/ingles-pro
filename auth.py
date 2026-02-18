@@ -135,12 +135,15 @@ def render_register():
         with c1:
             new_user = st.text_input("👤 Usuário", key="reg_user", placeholder="ex: aluno123")
             new_email = st.text_input("📧 Email", key="reg_email", placeholder="seu@email.com")
-            new_pass = st.text_input("🔑 Senha", type="password", key="reg_pass", placeholder="••••")
         with c2:
             new_name = st.text_input("📛 Nome", key="reg_name", placeholder="Seu nome")
-            st.write("") # Spacer
-            new_pass2 = st.text_input("🔑 Confirmar", type="password", key="reg_pass2", placeholder="••••")
         st.markdown("</div>", unsafe_allow_html=True)
+        
+        c3, c4 = st.columns(2)
+        with c3:
+             new_pass = st.text_input("🔑 Senha", type="password", key="reg_pass", placeholder="••••")
+        with c4:
+             new_pass2 = st.text_input("🔑 Confirmar Senha", type="password", key="reg_pass2", placeholder="••••")
         
         st.markdown("<br>", unsafe_allow_html=True)
         submitted = st.form_submit_button("🚀 CRIAR CONTA", use_container_width=True)
@@ -178,10 +181,13 @@ def render_register():
             # MODO SEM EMAIL: cadastro direto, sem verificacao
             ok = database.create_user(new_user, new_name, hashed)
             if ok:
+                # NUCLEAR OPTION: Clear authenticator cache to force reload of users from DB
                 if "_authenticator_instance" in st.session_state:
                     del st.session_state["_authenticator_instance"]
-                st.success("✅ Conta criada com sucesso! Agora faça login acima.")
-                st.balloons()
+                
+                st.success("✅ Conta criada com sucesso! A página será atualizada...")
+                time.sleep(1)
+                st.rerun()
             else:
                 st.error(f"❌ Usuário '{new_user}' já existe.")
 
@@ -241,6 +247,10 @@ def render_login() -> Optional[str]:
     # -----------------------------------------------------------
     # FIX: Preventing DuplicateElementKey (CookieManager conflict)
     # -----------------------------------------------------------
+    # -----------------------------------------------------------
+    # FIX: Preventing DuplicateElementKey (CookieManager conflict)
+    # -----------------------------------------------------------
+    # Force rebuild if not present OR if we suspect it's stale (e.g. just registered)
     if "_authenticator_instance" not in st.session_state:
         st.session_state["_authenticator_instance"] = _build_authenticator()
     
@@ -250,13 +260,9 @@ def render_login() -> Optional[str]:
     # URL SESSION CHECK (NUCLEAR OPTION ☢️)
     # ------------------------------------------------------------------
     
-    # [LOGOUT DETECTION] 
-    # Verifica se o usuario clicou em sair ANTES de qualquer logica de login
-    if st.session_state.get("logout_btn_main") or st.session_state.get("logout_btn_sidebar"):
-        st.query_params.clear()
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
+    # [LOGOUT DETECTION] - REMOVED TO FIX BUG
+    # Do not intercept logout here. Let it propagate to render_logout function.
+    pass
 
     # Se nao esta logado, checa se tem token na URL
     if st.session_state.get("authentication_status") is not True:
@@ -398,6 +404,12 @@ Plataforma de ensino com <strong>Inteligência Artificial</strong>, reconhecimen
 
             elif st.session_state.get("authentication_status") is False:
                 st.error("❌ Usuário ou senha incorretos.")
+                # NUCLEAR OPTION: Se falhou, limpa qualquer resquicio de sessao anterior
+                # Isso ajuda se o cookie estiver em conflito com o estado interno
+                keys_to_nuke = ['xp', 'indice', 'porc_atual', 'tentativa', 'pagina', 'arquivo_atual']
+                for k in keys_to_nuke:
+                     if k in st.session_state:
+                          del st.session_state[k]
         else:
             st.info("👋 Bem-vindo! Crie o primeiro usuário admin abaixo.")
 
@@ -431,32 +443,64 @@ def render_logout(location="sidebar"):
         </style>
         """, unsafe_allow_html=True)
 
-        if authenticator:
+        # CUSTOM LOGOUT IMPLEMENTATION (MAIN AREA)
+        if st.button("🚪 ENCERRAR SESSÃO", key="logout_btn_main", use_container_width=True):
+            # 1. Clear Authenticator State
+            st.session_state["authentication_status"] = None
+            st.session_state["username"] = None
+            st.session_state["name"] = None
+            st.session_state["logout"] = True
+            
+            # 2. Aggressive Cookie Clearing
             try:
-                # O proprio authenticator renderiza o botao e faz a logica
-                # Usar chave EXPLICITA para detecção antecipada
-                if authenticator.logout("🚪 ENCERRAR SESSÃO", location="main", key="logout_btn_main"):
-                    st.query_params.clear()
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Erro no componente de logout: {e}")
-                # Fallback manual
-                if st.button("Logout de Emergência"):
-                    for key in list(st.session_state.keys()):
-                        del st.session_state[key]
-                    st.query_params.clear() # Limpa URL
-                    st.rerun()
-    else:
-        if authenticator is not None:
-            try:
-                # O metodo logout do authenticator retorna True se o usuario clicou em sair
-                # Mas precisamos garantir que ele limpe a URL
-                # Usar chave EXPLICITA para detecção antecipada
-                if authenticator.logout("ENCERRAR SESSÃO", location=location, key="logout_btn_sidebar"):
-                    st.query_params.clear()
-                    st.rerun()
-            except Exception:
+                if authenticator and hasattr(authenticator, 'cookie_manager'):
+                    authenticator.cookie_manager.delete(authenticator.cookie_name)
+            except:
                 pass
+                
+            # 3. Clear App Session Data
+            keys_to_clear = [
+                'pagina', 'usuario', 'is_admin', 'is_premium',
+                'xp', 'indice', 'porc_atual', 'tentativa', 'arquivo_atual', 
+                'prova_modulo', 'prova_idx', 'god_mode', '_progresso_carregado'
+            ]
+            for k in keys_to_clear:
+                if k in st.session_state:
+                    del st.session_state[k]
+
+            # 4. Nuke URL and Rerun
+            st.query_params.clear()
+            st.rerun()
+    else:
+        # CUSTOM LOGOUT IMPLEMENTATION
+        # Bypass authenticator.logout bug by handling it manually
+        if st.button("🚪 ENCERRAR SESSÃO", key=f"logout_btn_{location}", use_container_width=True):
+            # 1. Clear Authenticator State
+            st.session_state["authentication_status"] = None
+            st.session_state["username"] = None
+            st.session_state["name"] = None
+            st.session_state["logout"] = True
+            
+            # 2. Aggressive Cookie Clearing (Try multiple paths)
+            try:
+                if authenticator and hasattr(authenticator, 'cookie_manager'):
+                    authenticator.cookie_manager.delete(authenticator.cookie_name)
+            except:
+                pass
+                
+            # 3. Clear App Session Data
+            keys_to_clear = [
+                'pagina', 'usuario', 'is_admin', 'is_premium',
+                'xp', 'indice', 'porc_atual', 'tentativa', 'arquivo_atual', 
+                'prova_modulo', 'prova_idx', 'god_mode', '_progresso_carregado'
+            ]
+            for k in keys_to_clear:
+                if k in st.session_state:
+                    del st.session_state[k]
+
+            # 4. Nuke URL and Rerun
+            st.query_params.clear()
+            st.rerun()
 
 
 def get_current_user() -> Optional[str]:

@@ -1248,6 +1248,77 @@ elif st.session_state['pagina'] == 'admin_panel':
             st.session_state['pagina'] = 'inicio'
             st.rerun()
 
+elif st.session_state['pagina'] == 'assinatura':
+    # Subscription / Payment Page
+    import streamlit.components.v1 as components
+    components.html("""
+<div style="text-align: center; padding: 40px 20px;">
+    <h1 style="font-size: 48px; font-weight: 800; background: linear-gradient(90deg, #8b5cf6, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        🚀 Desbloqueie Seu Potencial
+    </h1>
+    <p style="font-size: 20px; color: #a5b4c8; margin-top: 10px;">
+        Tenha acesso ilimitado a todos os módulos, recursos e ferramentas avançadas
+    </p>
+</div>
+""", height=200)
+    
+    # Pricing Cards
+    col1, col2, col3 = st.columns([1,4,1])
+    with col2:
+        components.html("""
+<div style="
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+    border: 2px solid rgba(139, 92, 246, 0.3);
+    border-radius: 20px;
+    padding: 40px;
+    margin: 20px 0;
+">
+    <div style="text-align: center;">
+        <div style="font-size: 18px; color: #8b5cf6; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px;">
+            ⭐ Plano Premium
+        </div>
+        <div style="font-size: 56px; font-weight: 800; color: #fff; margin: 20px 0;">
+            R$ 29<span style="font-size: 24px; color: #94a3b8;">/mês</span>
+        </div>
+        <div style="color: #64748b; margin-bottom: 30px;">Cancele quando quiser</div>
+    </div>
+    
+    <div style="margin: 30px 0; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px;">
+        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Acesso ilimitado a todos os módulos</div>
+        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Professor de Pronúncia IA completo</div>
+        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Modo Neural Sleep ilimitado</div>
+        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Provas orais adaptativas</div>
+        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Suporte prioritário</div>
+    </div>
+</div>
+""", height=500)
+        
+        st.markdown("### 💳 Escolha sua forma de pagamento:")
+        
+        payment_method = st.radio(
+            "Selecione:",
+            ["💰 PagSeguro", "🛒 Mercado Pago"],
+            label_visibility="collapsed"
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("🚀 ASSINAR AGORA", type="primary", use_container_width=True, key="subscribe_btn"):
+            if "PagSeguro" in payment_method:
+                st.info("🔄 **Redirecionando para PagSeguro...**\n\n*Em breve*: Integração com API do PagSeguro será implementada aqui.")
+                # TODO: Integrar com PagSeguro API
+                # pagseguro_url = create_pagseguro_checkout(username, plan="premium")
+                # st.markdown(f'<meta http-equiv="refresh" content="0;url={pagseguro_url}">', unsafe_allow_html=True)
+            else:
+                st.info("🔄 **Redirecionando para Mercado Pago...**\n\n*Em breve*: Integração com API do Mercado Pago será implementada aqui.")
+                # TODO: Integrar com Mercado Pago API
+                # mercadopago_url = create_mercadopago_preference(username, plan="premium")
+                # st.markdown(f'<meta http-equiv="refresh" content="0;url={mercadopago_url}">', unsafe_allow_html=True)
+        
+        if st.button("⬅ Voltar", key="sub_back"):
+            st.session_state['pagina'] = 'inicio'
+            st.rerun()
+
 elif st.session_state['pagina'] == 'inicio':
     # Calculate dynamic stats
     _all_progress = database.load_all_module_progress(username)
@@ -1515,6 +1586,88 @@ elif st.session_state['pagina'] == 'aula':
     current_idx_pos: int = int(st.session_state['indice'])
     pos = (current_idx_pos % len(banco)) + 1
     pct_progresso = int((pos / total) * 100)
+
+    # --- FREEMIUM LOCK LOGIC ---
+    _user_data = st.session_state.get('usuario', {})
+    is_premium = _user_data.get('is_premium', False)
+    # Define limit based on role (Admins bypass OR God Mode active)
+    if _user_data.get('is_admin', False) or st.session_state.get('god_mode', False):
+        is_premium = True
+        
+    if not is_premium and pos > 1:
+        # Render Lock Screen
+        import streamlit.components.v1 as components
+        components.html(f"""
+<div style="
+    background: linear-gradient(135deg, rgba(15, 10, 40, 0.95) 0%, rgba(30, 20, 60, 0.95) 100%);
+    border-radius: 24px;
+    padding: 60px 40px;
+    text-align: center;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    margin-top: 40px;
+    position: relative;
+    overflow: hidden;
+">
+    <div style="
+        position: absolute; top: 0; left: 0; right: 0; height: 4px;
+        background: linear-gradient(90deg, #8b5cf6, #ec4899, #06b6d4);
+    "></div>
+    
+    <div style="font-size: 80px; margin-bottom: 20px;">🔒</div>
+    <h2 style="color: #fff; font-size: 32px; font-weight: 800; margin-bottom: 10px;">Conteúdo Exclusivo Premium</h2>
+    <p style="color: #a5b4c8; font-size: 18px; margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto;">
+        Você completou a aula gratuita deste módulo! <br>
+        Desbloqueie o acesso completo a todos os módulos, avaliações e recursos avançados.
+    </p>
+    
+    <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+        <a href="javascript:void(0)" onclick="window.parent.postMessage({{type: 'streamlit:setComponentValue', value: 'upgrade'}}, '*')" style="
+            background: linear-gradient(90deg, #8b5cf6, #06b6d4);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 18px;
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4);
+            cursor: pointer;
+            transition: transform 0.2s;
+        ">🚀 DESBLOQUEAR AGORA</a>
+        
+        <button style="
+            background: rgba(255,255,255,0.05);
+            color: #a5b4c8;
+            padding: 16px 32px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+        " onclick="window.location.reload()">Mais Tarde</button>
+    </div>
+    
+    <div style="margin-top: 30px; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">
+        Módulo: {st.session_state['arquivo_atual'].replace('.csv','').upper()}
+    </div>
+</div>
+<br><br>
+""", height=600)
+        
+        # Botão Streamlit nativo para redirecionar (components.html não interage com session_state)
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            if st.button("🚀 VER PLANOS E ASSINAR", type="primary", use_container_width=True, key="upgrade_btn"):
+                st.session_state['pagina'] = 'assinatura'
+                st.rerun()
+        
+        if st.button("🔙 Voltar aos Módulos", key="paywall_back"):
+             st.session_state['pagina'] = 'selecao_modulos'
+             st.rerun()
+
+             
+        st.stop()
+
 
     # Max indice = fronteira do progresso (a licao mais avancada ja alcancada)
     max_indice = database.load_module_progress(username, st.session_state['arquivo_atual'])

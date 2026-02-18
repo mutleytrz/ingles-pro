@@ -78,7 +78,19 @@ def _render_user_management(current_admin_user: str):
                 if is_adm:
                     database.update_user_role(u['username'], False)
                     st.toast(f"{u['username']} removido de Admin.")
+                    st.toast(f"{u['username']} removido de Admin.")
                     st.rerun()
+
+            # is_premium toggle
+            is_prem = bool(u.get('is_premium', 0))
+            new_prem = st.checkbox("Premium", value=is_prem, key=f"is_prem_{u['username']}")
+            if new_prem != is_prem:
+                database.update_user_premium(u['username'], new_prem)
+                st.toast(f"Status Premium de {u['username']}: {'ATIVADO' if new_prem else 'REMOVIDO'}")
+                # Update session state if modifying self
+                if is_self:
+                    st.session_state['usuario']['is_premium'] = new_prem
+                st.rerun()
 
             # Password Reset
             if st.button("🔑", key=f"pwd_{u['username']}", help="Resetar Senha"):
@@ -136,9 +148,37 @@ def _render_tester_tools(test_oral_callback=None):
         st.toast(f"God Mode {'ATIVADO' if toggle else 'DESATIVADO'}")
         st.rerun()
 
+
     st.divider()
     
+    # Premium Preview Toggle - Admin Testing Tool
+    st.markdown("### 👁️ Visualização de Paywall")
+    st.caption("Simule como usuários não-premium veem a tela de upgrade")
+    
+    preview_mode = st.session_state.get('preview_as_free', False)
+    toggle_preview = st.toggle("🔍 Simular Usuário Gratuito (Remove Premium Temporário)", value=preview_mode)
+    
+    if toggle_preview != preview_mode:
+        st.session_state['preview_as_free'] = toggle_preview
+        # IMPORTANTE: Atualiza também o objeto usuario para refletir na session
+        if toggle_preview:
+            # Backup do estado real
+            st.session_state['_premium_backup'] = st.session_state.get('usuario', {}).get('is_premium', False)
+            if 'usuario' in st.session_state:
+                st.session_state['usuario']['is_premium'] = False
+            st.toast("🔍 Modo Preview ATIVADO - Você verá a tela de paywall como usuário gratuito")
+        else:
+            # Restaura estado real
+            if 'usuario' in st.session_state and '_premium_backup' in st.session_state:
+                st.session_state['usuario']['is_premium'] = st.session_state['_premium_backup']
+            st.toast("✅ Modo Preview DESATIVADO - Status premium restaurado")
+        st.rerun()
+    
+    if toggle_preview:
+        st.info("💡 **Dica:** Acesse qualquer módulo e vá para a 2ª lição para ver o paywall aparecer!")
+    
     st.divider()
+
     
     st.markdown("### 🧪 Ferramentas de Teste Rápido")
     if test_oral_callback:

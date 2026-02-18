@@ -406,6 +406,71 @@ def render_pronunciation_coach(username: str):
     idx = int(st.session_state["coach_idx"])
     total = len(banco)
 
+    # --- FREEMIUM LOCK LOGIC ---
+    _user_data = st.session_state.get('usuario', {})
+    is_premium = _user_data.get('is_premium', False)
+    if _user_data.get('is_admin', False) or st.session_state.get('god_mode', False):
+        is_premium = True
+
+    if not is_premium and idx > 0:
+        # Render Lock Screen
+        import streamlit.components.v1 as components
+        components.html(f"""
+<div style="
+    background: linear-gradient(135deg, rgba(15, 10, 40, 0.95) 0%, rgba(30, 20, 60, 0.95) 100%);
+    border-radius: 24px;
+    padding: 50px 30px;
+    text-align: center;
+    border: 1px solid rgba(34, 211, 238, 0.3);
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    margin: 20px 0;
+    position: relative;
+    overflow: hidden;
+">
+    <div style="
+        position: absolute; top: 0; left: 0; right: 0; height: 4px;
+        background: linear-gradient(90deg, #22d3ee, #8b5cf6, #22d3ee);
+    "></div>
+    
+    <div style="font-size: 70px; margin-bottom: 20px;">🎓🔒</div>
+    <h2 style="color: #fff; font-size: 28px; font-weight: 800; margin-bottom: 10px;">Treino Avançado Bloqueado</h2>
+    <p style="color: #a5b4c8; font-size: 16px; margin-bottom: 30px; max-width: 500px; margin-left: auto; margin-right: auto;">
+        Você completou a frase gratuita deste módulo! <br>
+        O treino completo contém dezenas de frases com feedback detalhado.
+    </p>
+    
+    <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+        <a href="#" style="
+            background: linear-gradient(90deg, #22d3ee, #06b6d4);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 16px;
+            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4);
+        ">⚡ VIRAR PREMIUM</a>
+        
+        <button style="
+             background: rgba(255,255,255,0.05);
+             color: #94a3b8;
+             padding: 14px 28px;
+             border-radius: 12px;
+             border: 1px solid rgba(255,255,255,0.1);
+             font-weight: 600;
+             font-size: 14px;
+             cursor: pointer;
+        " onclick="window.location.reload()">Agora não</button>
+    </div>
+</div>
+""", height=500)
+        
+        if st.button("⬅ Voltar aos Módulos", key="lock_back_btn"):
+             st.session_state["coach_module"] = None
+             st.rerun()
+             
+        st.stop()
+
     if idx >= total:
         # Sessão completa
         _render_session_complete(st.session_state["coach_history"], total)

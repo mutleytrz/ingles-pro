@@ -154,7 +154,9 @@ def init_db() -> None:
             username    TEXT    UNIQUE NOT NULL,
             name        TEXT    NOT NULL,
             password_hash TEXT  NOT NULL,
+            email       TEXT    UNIQUE,
             is_admin    BOOLEAN DEFAULT 0,
+            is_premium  BOOLEAN DEFAULT 0,
             created_at  TEXT    DEFAULT (datetime('now'))
         );
 
@@ -202,6 +204,10 @@ def _check_migrations():
             conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
             conn.execute("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 0")
             conn.execute("ALTER TABLE users ADD COLUMN verification_code TEXT")
+
+        if "is_premium" not in columns:
+            print("[MIGRATION] Adicionando coluna is_premium na tabela users...")
+            conn.execute("ALTER TABLE users ADD COLUMN is_premium BOOLEAN DEFAULT 0")
 
         # Lesson scores table (best score per lesson for badges)
         conn.execute("""
@@ -309,7 +315,7 @@ def get_user(username: str) -> Optional[dict]:
     """Retorna dict do usuario ou None."""
     conn = _get_conn()
     row = conn.execute(
-        "SELECT username, name, password_hash FROM users WHERE username = ?",
+        "SELECT username, name, password_hash, is_premium FROM users WHERE username = ?",
         (username,),
     ).fetchone()
     if row:
@@ -349,6 +355,16 @@ def update_user_password(username: str, new_hash: str) -> None:
     conn.execute(
         "UPDATE users SET password_hash = ? WHERE username = ?",
         (new_hash, username),
+    )
+    conn.commit()
+
+
+def update_user_premium(username: str, is_premium: bool) -> None:
+    """Atualiza status Premium do usuario."""
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE users SET is_premium = ? WHERE username = ?",
+        (1 if is_premium else 0, username),
     )
     conn.commit()
 

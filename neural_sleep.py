@@ -547,8 +547,54 @@ def render_neural_mode(username: str):
                 full_path = os.path.join(config.CSV_DIR, arquivo_csv)
                 try:
                     df = pd.read_csv(full_path)
-                    # Pega apenas 30 frases para nao travar o servidor
-                    df_slice = df.head(30)
+                    
+                    # --- FREEMIUM LOGIC ---
+                    _user_data = st.session_state.get('usuario', {})
+                    is_premium = _user_data.get('is_premium', False)
+                    if _user_data.get('is_admin', False) or st.session_state.get('god_mode', False):
+                        is_premium = True
+                        
+                    if not is_premium:
+                        df_slice = df.head(1)
+                        # Premium Upsell Component for Sleep Mode
+                        st.markdown("""
+                        <div style="
+                            background: linear-gradient(90deg, rgba(30, 20, 60, 0.6) 0%, rgba(139, 92, 246, 0.15) 100%);
+                            border: 1px solid rgba(139, 92, 246, 0.3);
+                            border-radius: 16px;
+                            padding: 20px;
+                            margin: 20px 0;
+                            display: flex;
+                            align-items: center;
+                            gap: 20px;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                        ">
+                            <div style="font-size: 32px; filter: drop-shadow(0 0 10px rgba(139,92,246,0.5));">💎</div>
+                            <div style="flex: 1;">
+                                <h4 style="margin: 0; color: #f8fafc; font-family: 'Outfit', sans-serif; font-size: 18px;">Modo Demonstração</h4>
+                                <p style="margin: 5px 0 0; color: #cbd5e1; font-size: 14px; line-height: 1.5;">
+                                    Você está ouvindo uma sessão demo de 1 frase. 
+                                    <br><strong style="color: #a78bfa;">Assine o Premium</strong> para desbloquear sessões profundas de 30 frases.
+                                </p>
+                            </div>
+                            <a href="#" style="
+                                background: linear-gradient(90deg, #8b5cf6, #d946ef);
+                                color: white;
+                                text-decoration: none;
+                                padding: 10px 20px;
+                                border-radius: 8px;
+                                font-weight: 700;
+                                font-size: 14px;
+                                white-space: nowrap;
+                                box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+                                text-transform: uppercase;
+                                letter-spacing: 0.5px;
+                            ">Virar Premium</a>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        # Pega apenas 30 frases para nao travar o servidor (Premium)
+                        df_slice = df.head(30)
                     
                     audio_bytes = generate_full_lesson_audio(df_slice)
                     
