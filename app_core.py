@@ -1360,6 +1360,7 @@ st.markdown(f"""
     </a>
     <div class="user-pill">
         <span>👤 {st.session_state.get('name', username)}</span>
+        {"<span class='premium-badge-nav' style='background:linear-gradient(90deg,#f59e0b,#fbbf24); color:#000; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:bold; margin-left:5px; border:1px solid #d97706;box-shadow:0 0 10px rgba(245,158,11,0.3);'>👑 PREMIUM</span>" if st.session_state.get('usuario', {}).get('is_premium') else ""}
         <span class="xp-tier-badge" style="background:rgba(139,92,246,0.1);color:{_tier_color};border:1px solid {_tier_color}33;">{_tier_emoji} {_tier_name}</span>
         <span class="xp-badge">⭐ {st.session_state['xp']} XP</span>
     </div>
@@ -1388,10 +1389,18 @@ with st.sidebar:
         st.session_state['pagina'] = 'neural_sleep'
         st.rerun()
 
-    # -- PREMIUM UPSELL --
+    # -- PREMIUM STATUS / UPSELL --
     _user_prem = st.session_state.get('usuario', {}).get('is_premium', False)
-    if not _user_prem and not god_mode:
-        st.markdown("---")
+    st.markdown("---")
+    if _user_prem or god_mode:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg, rgba(245,158,11,0.15), rgba(251,191,36,0.05)); padding:15px; border-radius:12px; border:1px solid rgba(245,158,11,0.3); text-align:center; box-shadow:0 0 15px rgba(245,158,11,0.1);">
+            <div style="font-size:28px; margin-bottom:5px;">👑</div>
+            <div style="font-size:14px; color:#fbbf24; font-weight:800; letter-spacing:1px; margin-bottom:2px;">MEMBRO PREMIUM</div>
+            <div style="font-size:11px; color:#fcd34d; opacity:0.8;">Acesso Vitalício Liberado</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
         st.markdown("""
         <div style="background:rgba(139,92,246,0.1); padding:15px; border-radius:12px; border:1px solid rgba(139,92,246,0.2); text-align:center;">
             <div style="font-size:24px; margin-bottom:10px;">💎</div>
@@ -1598,7 +1607,10 @@ elif st.session_state['pagina'] == 'inicio':
     # ===== HERO SECTION — Immersive Cosmic Wrapper =====
     st.markdown(f"""
 <div class="home-hero-wrap">
-<div class="hero-badge">🧠 INTELIGÊNCIA ARTIFICIAL APLICADA</div>
+<div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
+    <div class="hero-badge">🧠 INTELIGÊNCIA ARTIFICIAL APLICADA</div>
+    {"<div style='background:linear-gradient(90deg,#f59e0b,#fbbf24); color:#000; padding:6px 15px; border-radius:30px; font-size:12px; font-weight:800; border:1px solid #d97706; box-shadow:0 0 20px rgba(245,158,11,0.4); display:flex; align-items:center; gap:5px;'>👑 MEMBRO PREMIUM</div>" if st.session_state.get('usuario', {}).get('is_premium') else ""}
+</div>
 <h1 class="hero-title">
 Domine o Inglês com<br>
 <span class="hero-highlight">Tecnologia de Ponta</span>
