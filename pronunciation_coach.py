@@ -448,6 +448,67 @@ def render_pronunciation_coach(username: str):
 <div style="height:100%; width:{pct}%; background:linear-gradient(90deg,#06b6d4,#8b5cf6); border-radius:4px; transition:width 0.5s;"></div>
 </div>""", unsafe_allow_html=True)
 
+    # --- AVATAR & VISUAL NOVEL STYLE ---
+    # CSS Animation for breathing/floating
+    st.markdown("""
+<style>
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+@keyframes pulse-ring {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+}
+.avatar-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: -20px;
+    position: relative;
+    z-index: 10;
+}
+.avatar-img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 4px solid #22d3ee;
+    background: #0f172a;
+    animation: float 6s ease-in-out infinite, pulse-ring 3s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+    object-fit: cover;
+}
+.speech-bubble {
+    position: absolute;
+    top: 0;
+    right: 50%;
+    transform: translateX(140%);
+    background: #fff;
+    color: #0f172a;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-style: solid;
+    border-width: 6px 6px 6px 0;
+    border-color: transparent #fff transparent transparent;
+}
+</style>
+<div class="avatar-container">
+    <img src="https://api.dicebear.com/9.x/notionists/svg?seed=Teacher&backgroundColor=b6e3f4" class="avatar-img">
+    <div class="speech-bubble">Listen and repeat! 🎧</div>
+</div>
+""", unsafe_allow_html=True)
+
     # --- CARD DA FRASE ---
     pronunciation_guide = get_pronunciation_guide(frase_en)
 
