@@ -188,17 +188,27 @@ def _get_conn():
     global _using_turso, _turso_singleton
     import config
 
-    # Se tiver credenciais do Turso, conecta via client custom (HTTP)
+    # Se tiver credenciais do Turso, tenta primeiro a lib nativa (mais rápida: WebSockets/gRPC)
     if config.TURSO_DB_URL and config.TURSO_AUTH_TOKEN:
         if _turso_singleton is not None and not _turso_singleton._closed:
             return _turso_singleton
         try:
-            client = TursoClientCustom(config.TURSO_DB_URL, config.TURSO_AUTH_TOKEN)
+            from libsql_client import create_client_sync
+            url = config.TURSO_DB_URL
+            client = create_client_sync(url, auth_token=config.TURSO_AUTH_TOKEN)
             _using_turso = True
             _turso_singleton = TursoConnection(client)
             return _turso_singleton
         except Exception as e:
-            print(f"ERRO DE CONEXAO TURSO CUSTOM: {e}. Usando SQLite local.")
+            # Fallback para o cliente customizado se a lib nativa falhar (ex: erro de compatibilidade)
+            print(f"[DB] Fallback Turso: {e}. Usando TursoClientCustom.")
+            try:
+                client = TursoClientCustom(config.TURSO_DB_URL, config.TURSO_AUTH_TOKEN)
+                _using_turso = True
+                _turso_singleton = TursoConnection(client)
+                return _turso_singleton
+            except Exception as e2:
+                print(f"[DB] Erro crítico no fallback: {e2}")
 
     # Fallback SQLite Local
     _using_turso = False
