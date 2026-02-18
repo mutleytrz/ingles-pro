@@ -459,27 +459,27 @@ def render_pronunciation_coach(username: str):
     # Placeholder para permitir atualização dinâmica sem rerun
     avatar_placeholder = st.empty()
 
-    def render_avatar(msg):
-        avatar_placeholder.markdown(f"""
+    # CSS Animation for breathing/floating (Define styles once)
+    st.markdown("""
 <style>
-@keyframes float {{
-    0% {{ transform: translateY(0px); }}
-    50% {{ transform: translateY(-10px); }}
-    100% {{ transform: translateY(0px); }}
-}}
-@keyframes pulse-ring {{
-    0% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }}
-    70% {{ transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }}
-    100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }}
-}}
-.avatar-container {{
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+@keyframes pulse-ring {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+}
+.avatar-container {
     display: flex;
     justify-content: center;
     margin-bottom: -20px;
     position: relative;
     z-index: 10;
-}}
-.avatar-img {{
+}
+.avatar-img {
     width: 120px;
     height: 120px;
     border-radius: 50%;
@@ -487,8 +487,8 @@ def render_pronunciation_coach(username: str):
     background: #0f172a;
     animation: float 6s ease-in-out infinite, pulse-ring 3s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
     object-fit: cover;
-}}
-.speech-bubble {{
+}
+.speech-bubble {
     position: absolute;
     top: -20px;
     right: 50%;
@@ -508,8 +508,8 @@ def render_pronunciation_coach(username: str):
     border: 3px solid #22d3ee;
     z-index: 20;
     line-height: 1.4;
-}}
-.speech-bubble::after {{
+}
+.speech-bubble::after {
     content: '';
     position: absolute;
     left: -8px;
@@ -518,8 +518,8 @@ def render_pronunciation_coach(username: str):
     border-style: solid;
     border-width: 8px 8px 8px 0;
     border-color: transparent #22d3ee transparent transparent;
-}}
-.speech-bubble::before {{
+}
+.speech-bubble::before {
     content: '';
     position: absolute;
     left: -5px;
@@ -529,8 +529,15 @@ def render_pronunciation_coach(username: str):
     border-width: 8px 8px 8px 0;
     border-color: transparent #fff transparent transparent;
     z-index: 1;
-}}
+}
 </style>
+""", unsafe_allow_html=True)
+    
+    # Placeholder para permitir atualização dinâmica sem re-injectar CSS
+    avatar_placeholder = st.empty()
+
+    def render_avatar(msg):
+        avatar_placeholder.markdown(f"""
 <div class="avatar-container">
     <img src="https://api.dicebear.com/9.x/notionists/svg?seed=Teacher&backgroundColor=b6e3f4" class="avatar-img">
     <div class="speech-bubble">{msg}</div>
