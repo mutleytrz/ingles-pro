@@ -32,7 +32,6 @@ def _build_authenticator():
     # [DEBUG]
     # print(f"[AUTH] Authenticator built. Cookie: ingles_pro_cookie. Secret len: {len(str(cookie_secret))}")
     return authenticator
-    return authenticator
 
 
 def _generate_code() -> str:

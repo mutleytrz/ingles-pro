@@ -22,7 +22,6 @@ from typing import Optional
 import config
 import database
 import auth
-import auth
 import icons
 import admin_panel
 import neural_sleep

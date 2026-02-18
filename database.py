@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from config import DB_PATH
 from typing import Optional, Any
+import streamlit as st
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +85,12 @@ class TursoConnection:
         pass
 
     def close(self):
-        """Fecha o client."""
+        """No-op para o singleton — conexao eh reusada.
+        Use close_for_real() para fechar de verdade."""
+        pass
+
+    def close_for_real(self):
+        """Fecha o client de verdade (usado apenas no shutdown)."""
         if not self._closed:
             try:
                 self._client.close()
@@ -96,22 +102,26 @@ class TursoConnection:
         return self
 
     def __exit__(self, *args):
-        self.close()
+        pass  # Nao fecha — singleton
 
 
 # ---------------------------------------------------------------------------
 # Flag global: True se estamos usando Turso
 # ---------------------------------------------------------------------------
 _using_turso = False
+_turso_singleton: TursoConnection | None = None  # Singleton para reuso
 
 
 def _get_conn():
-    """Retorna conexao com o banco (SQLite local ou Turso remoto via HTTP)."""
-    global _using_turso
+    """Retorna conexao reutilizavel (singleton para Turso, nova para SQLite)."""
+    global _using_turso, _turso_singleton
     import config
 
     # Se tiver credenciais do Turso, conecta via libsql-client (HTTP)
     if config.TURSO_DB_URL and config.TURSO_AUTH_TOKEN:
+        # Reusa conexão existente se ainda estiver aberta
+        if _turso_singleton is not None and not _turso_singleton._closed:
+            return _turso_singleton
         try:
             from libsql_client import create_client_sync
             url = config.TURSO_DB_URL
@@ -120,7 +130,8 @@ def _get_conn():
                 url = url.replace("libsql://", "https://", 1)
             client = create_client_sync(url, auth_token=config.TURSO_AUTH_TOKEN)
             _using_turso = True
-            return TursoConnection(client)
+            _turso_singleton = TursoConnection(client)
+            return _turso_singleton
         except ImportError:
             print("AVISO: libsql-client nao instalado. Usando SQLite local.")
         except Exception as e:
@@ -171,11 +182,11 @@ def init_db() -> None:
         );
     """)
     conn.commit()
-    conn.close()
     _check_migrations()
 
 def _check_migrations():
-    """Verifica e aplica migracoes de schema necessarias (ex: is_admin)."""
+    """Verifica e aplica migracoes de schema necessarias (ex: is_admin).
+    OTIMIZADO: usa uma unica conexao e um unico commit."""
     conn = _get_conn()
     try:
         # Check if is_admin exists
@@ -184,7 +195,6 @@ def _check_migrations():
         if "is_admin" not in columns:
             print("[MIGRATION] Adicionando coluna is_admin na tabela users...")
             conn.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0")
-            conn.commit()
 
         # Email auth migrations
         if "email" not in columns:
@@ -192,7 +202,6 @@ def _check_migrations():
             conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
             conn.execute("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 0")
             conn.execute("ALTER TABLE users ADD COLUMN verification_code TEXT")
-            conn.commit()
 
         # Lesson scores table (best score per lesson for badges)
         conn.execute("""
@@ -207,7 +216,6 @@ def _check_migrations():
                 FOREIGN KEY (username) REFERENCES users(username)
             )
         """)
-        conn.commit()
 
         # Word errors table (adaptive learning — tracks per-word error counts)
         conn.execute("""
@@ -222,11 +230,10 @@ def _check_migrations():
                 FOREIGN KEY (username) REFERENCES users(username)
             )
         """)
+        # Um unico commit para todas as migracoes
         conn.commit()
     except Exception as e:
         print(f"[ERR] Falha na migracao: {e}")
-    finally:
-        conn.close()
 
 
 # -- Usuarios --
@@ -247,8 +254,6 @@ def create_user(username: str, name: str, password_hash: str) -> bool:
         if "unique" in err_msg or "constraint" in err_msg or isinstance(e, sqlite3.IntegrityError):
             return False
         raise  # Re-raise se nao for erro de unicidade
-    finally:
-        conn.close()
 
 
 def create_user_with_email(username: str, name: str, password_hash: str, email: str, code: str) -> bool:
@@ -266,46 +271,38 @@ def create_user_with_email(username: str, name: str, password_hash: str, email: 
         if "unique" in err_msg or "constraint" in err_msg or isinstance(e, sqlite3.IntegrityError):
             return False
         raise
-    finally:
-        conn.close()
 
 
 def verify_email_code(username: str, code: str) -> bool:
     """Verifica se o codigo bate e ativa a conta."""
     conn = _get_conn()
-    try:
-        cursor = conn.execute(
-            "SELECT verification_code FROM users WHERE username = ?", (username,)
-        )
-        row = cursor.fetchone()
-        if not row:
-            return False
-        
-        saved_code = row["verification_code"]
-        if saved_code == code:
-            conn.execute("UPDATE users SET email_verified = 1 WHERE username = ?", (username,))
-            conn.commit()
-            return True
+    cursor = conn.execute(
+        "SELECT verification_code FROM users WHERE username = ?", (username,)
+    )
+    row = cursor.fetchone()
+    if not row:
         return False
-    finally:
-        conn.close()
+    
+    saved_code = row["verification_code"]
+    if saved_code == code:
+        conn.execute("UPDATE users SET email_verified = 1 WHERE username = ?", (username,))
+        conn.commit()
+        return True
+    return False
 
 
 def is_email_verified(username: str) -> bool:
     """Retorna True se o email esta verificado (ou se eh conta antiga sem email)."""
     conn = _get_conn()
-    try:
-        row = conn.execute("SELECT email, email_verified FROM users WHERE username = ?", (username,)).fetchone()
-        if not row:
-            return False
+    row = conn.execute("SELECT email, email_verified FROM users WHERE username = ?", (username,)).fetchone()
+    if not row:
+        return False
+    
+    # Se nao tem email (usuario antigo), considera verificado
+    if not row["email"]:
+        return True
         
-        # Se nao tem email (usuario antigo), considera verificado
-        if not row["email"]:
-            return True
-            
-        return bool(row["email_verified"])
-    finally:
-        conn.close()
+    return bool(row["email_verified"])
 
 
 def get_user(username: str) -> Optional[dict]:
@@ -315,22 +312,20 @@ def get_user(username: str) -> Optional[dict]:
         "SELECT username, name, password_hash FROM users WHERE username = ?",
         (username,),
     ).fetchone()
-    conn.close()
     if row:
         return dict(row)
     return None
 
 
+@st.cache_data(ttl=120, show_spinner=False)
 def is_user_admin(username: str) -> bool:
-    """Verifica se usuario eh admin."""
+    """Verifica se usuario eh admin. Cacheado por 2 min."""
     conn = _get_conn()
     row = conn.execute(
         "SELECT is_admin FROM users WHERE username = ?",
         (username,),
     ).fetchone()
-    conn.close()
     if row:
-        print(f"[DEBUG] is_user_admin({username}) -> {row['is_admin']} (Type: {type(row['is_admin'])})")
         if row["is_admin"]:
             return True
     return False
@@ -344,7 +339,8 @@ def update_user_role(username: str, is_admin: bool) -> None:
         (1 if is_admin else 0, username),
     )
     conn.commit()
-    conn.close()
+    # Limpa cache do is_user_admin
+    is_user_admin.clear()
 
 
 def update_user_password(username: str, new_hash: str) -> None:
@@ -355,7 +351,6 @@ def update_user_password(username: str, new_hash: str) -> None:
         (new_hash, username),
     )
     conn.commit()
-    conn.close()
 
 
 def update_user_xp(username: str, xp: int) -> None:
@@ -374,10 +369,7 @@ def update_user_xp(username: str, xp: int) -> None:
             VALUES (?, ?, 'inicio', 'palavras.csv', 0, 0, 0, datetime('now'))
         """, (username, xp))
     conn.commit()
-    conn.close()
 
-
-import streamlit as st
 
 @st.cache_data(ttl=60, show_spinner=False)
 def get_all_users_detailed() -> list[dict]:
@@ -397,11 +389,6 @@ def get_all_users_detailed() -> list[dict]:
     except Exception as e:
         print(f"[ERR] get_all_users_detailed: {e}")
         return []
-    finally:
-        try:
-            conn.close()
-        except:
-            pass
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -412,7 +399,6 @@ def get_all_users() -> dict:
     """
     conn = _get_conn()
     rows = conn.execute("SELECT username, name, password_hash FROM users").fetchall()
-    conn.close()
     credentials: dict = {"usernames": {}}
     for r in rows:
         credentials["usernames"][r["username"]] = {
@@ -442,7 +428,6 @@ def save_progress(username: str, pagina: str, arquivo_atual: str,
     """, (username, pagina, arquivo_atual, indice, xp, porc_atual, tentativa,
           datetime.now(timezone.utc).isoformat()))
     conn.commit()
-    conn.close()
 
 
 def load_progress(username: str) -> Optional[dict]:
@@ -452,7 +437,6 @@ def load_progress(username: str) -> Optional[dict]:
         "SELECT pagina, arquivo_atual, indice, xp, porc_atual, tentativa FROM progress WHERE username = ?",
         (username,),
     ).fetchone()
-    conn.close()
     if row:
         return dict(row)
     return None
@@ -471,7 +455,6 @@ def save_module_progress(username: str, module_file: str, indice: int) -> None:
             updated_at=excluded.updated_at
     """, (username, module_file, indice, datetime.now(timezone.utc).isoformat()))
     conn.commit()
-    conn.close()
 
 
 def load_module_progress(username: str, module_file: str) -> int:
@@ -481,7 +464,6 @@ def load_module_progress(username: str, module_file: str) -> int:
         "SELECT indice FROM module_progress WHERE username = ? AND module_file = ?",
         (username, module_file),
     ).fetchone()
-    conn.close()
     if row:
         return row["indice"]
     return 0
@@ -494,7 +476,6 @@ def load_all_module_progress(username: str) -> dict:
         "SELECT module_file, indice FROM module_progress WHERE username = ?",
         (username,),
     ).fetchall()
-    conn.close()
     return {r["module_file"]: r["indice"] for r in rows}
 
 
@@ -512,7 +493,6 @@ def save_lesson_score(username: str, module_file: str, lesson_idx: int, score: i
     """, (username, module_file, lesson_idx, score,
           datetime.now(timezone.utc).isoformat()))
     conn.commit()
-    conn.close()
 
 
 def load_lesson_score(username: str, module_file: str, lesson_idx: int) -> int:
@@ -522,7 +502,6 @@ def load_lesson_score(username: str, module_file: str, lesson_idx: int) -> int:
         "SELECT best_score FROM lesson_scores WHERE username = ? AND module_file = ? AND lesson_idx = ?",
         (username, module_file, lesson_idx),
     ).fetchone()
-    conn.close()
     if row:
         return row["best_score"]
     return 0
@@ -549,8 +528,6 @@ def record_word_errors(username: str, wrong_words: list[str], all_words: list[st
         conn.commit()
     except Exception as e:
         print(f"[ERR] record_word_errors: {e}")
-    finally:
-        conn.close()
 
 
 def get_weak_words(username: str, limit: int = 30) -> list[dict]:
@@ -568,33 +545,31 @@ def get_weak_words(username: str, limit: int = 30) -> list[dict]:
     except Exception as e:
         print(f"[ERR] get_weak_words: {e}")
         return []
-    finally:
-        conn.close()
 
 
 def delete_user(username: str) -> bool:
     """Remove completamente um usuario e seus dados."""
     conn = _get_conn()
     try:
+        # Lista tabelas uma vez so (reusa a mesma conexao)
+        tables = _get_tables(conn)
         # Remove de todas as tabelas referenciadas
         conn.execute("DELETE FROM progress WHERE username = ?", (username,))
         conn.execute("DELETE FROM module_progress WHERE username = ?", (username,))
-        # Verifica se lesson_scores existe antes de tentar deletar
-        if "lesson_scores" in _get_tables(conn):
+        if "lesson_scores" in tables:
              conn.execute("DELETE FROM lesson_scores WHERE username = ?", (username,))
-        if "word_errors" in _get_tables(conn):
+        if "word_errors" in tables:
              conn.execute("DELETE FROM word_errors WHERE username = ?", (username,))
         conn.execute("DELETE FROM users WHERE username = ?", (username,))
         conn.commit()
+        # Limpa caches apos deletar
+        is_user_admin.clear()
+        get_all_users.clear()
+        get_all_users_detailed.clear()
         return True
     except Exception as e:
         print(f"[ERR] delete_user: {e}")
         return False
-    finally:
-        try:
-            conn.close()
-        except:
-            pass
 
 
 def _get_tables(conn) -> list[str]:
