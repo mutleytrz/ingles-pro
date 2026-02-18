@@ -531,21 +531,11 @@ def render_pronunciation_coach(username: str):
     z-index: 1;
 }
 </style>
-""", unsafe_allow_html=True)
-    
-    # Placeholder para permitir atualização dinâmica sem re-injectar CSS
-    avatar_placeholder = st.empty()
-
-    def render_avatar(msg):
-        avatar_placeholder.markdown(f"""
 <div class="avatar-container">
     <img src="https://api.dicebear.com/9.x/notionists/svg?seed=Teacher&backgroundColor=b6e3f4" class="avatar-img">
-    <div class="speech-bubble">{msg}</div>
+    <div class="speech-bubble">Listen and repeat! 🎧</div>
 </div>
 """, unsafe_allow_html=True)
-
-    # Render inicial
-    render_avatar(avatar_msg)
 
     # --- CARD DA FRASE ---
     pronunciation_guide = get_pronunciation_guide(frase_en)
