@@ -435,6 +435,7 @@ def render_pronunciation_coach(username: str):
             if st.button("Próxima ➡", key="coach_next"):
                 st.session_state["coach_idx"] = idx + 1
                 st.session_state["coach_attempt"] = 0
+                st.session_state["coach_last_spoken"] = "Listen and repeat! 🎧"
                 st.rerun()
     with c_exit:
         if st.button("❌ Sair", key="coach_exit"):
@@ -449,27 +450,33 @@ def render_pronunciation_coach(username: str):
 </div>""", unsafe_allow_html=True)
 
     # --- AVATAR & VISUAL NOVEL STYLE ---
+    # Determine avatar message
+    if "coach_last_spoken" not in st.session_state:
+        st.session_state["coach_last_spoken"] = "Listen and repeat! 🎧"
+
+    avatar_msg = st.session_state["coach_last_spoken"]
+
     # CSS Animation for breathing/floating
-    st.markdown("""
+    st.markdown(f"""
 <style>
-@keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-    100% { transform: translateY(0px); }
-}
-@keyframes pulse-ring {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
-}
-.avatar-container {
+@keyframes float {{
+    0% {{ transform: translateY(0px); }}
+    50% {{ transform: translateY(-10px); }}
+    100% {{ transform: translateY(0px); }}
+}}
+@keyframes pulse-ring {{
+    0% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }}
+    70% {{ transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }}
+    100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }}
+}}
+.avatar-container {{
     display: flex;
     justify-content: center;
     margin-bottom: -20px;
     position: relative;
     z-index: 10;
-}
-.avatar-img {
+}}
+.avatar-img {{
     width: 120px;
     height: 120px;
     border-radius: 50%;
@@ -477,35 +484,51 @@ def render_pronunciation_coach(username: str):
     background: #0f172a;
     animation: float 6s ease-in-out infinite, pulse-ring 3s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
     object-fit: cover;
-}
-.speech-bubble {
+}}
+.speech-bubble {{
     position: absolute;
-    top: 0;
+    top: -10px;
     right: 50%;
-    transform: translateX(140%);
+    transform: translateX(160%);
     background: #fff;
     color: #0f172a;
-    padding: 8px 16px;
-    border-radius: 12px;
-    font-size: 12px;
+    padding: 12px 20px;
+    border-radius: 16px;
+    font-size: 16px;
     font-weight: 700;
     white-space: nowrap;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-.speech-bubble::after {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    max-width: 250px;
+    white-space: normal;
+    text-align: center;
+    border: 2px solid #22d3ee;
+    z-index: 20;
+}}
+.speech-bubble::after {{
     content: '';
     position: absolute;
-    left: -6px;
+    left: -8px;
     top: 50%;
     transform: translateY(-50%);
     border-style: solid;
-    border-width: 6px 6px 6px 0;
+    border-width: 8px 8px 8px 0;
+    border-color: transparent #22d3ee transparent transparent;
+}}
+.speech-bubble::before {{
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-style: solid;
+    border-width: 8px 8px 8px 0;
     border-color: transparent #fff transparent transparent;
-}
+    z-index: 1;
+}}
 </style>
 <div class="avatar-container">
     <img src="https://api.dicebear.com/9.x/notionists/svg?seed=Teacher&backgroundColor=b6e3f4" class="avatar-img">
-    <div class="speech-bubble">Listen and repeat! 🎧</div>
+    <div class="speech-bubble">{avatar_msg}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -584,6 +607,9 @@ def render_pronunciation_coach(username: str):
             st.warning("🤔 Não consegui ouvir nada. Tente falar mais alto e perto do microfone.")
             return
 
+        # Atualiza o que o avatar diz
+        st.session_state["coach_last_spoken"] = f"Você disse: '{ouvida}' 😮"
+        
         # Analisa pronúncia
         analysis = analyze_pronunciation(frase_en, ouvida)
 
