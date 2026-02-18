@@ -1583,6 +1583,14 @@ elif st.session_state['pagina'] == 'assinatura':
                     if url: st.markdown(f'<meta http-equiv="refresh" content="0; url={url}">', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- DEBUG SECTION (Temporary) ---
+    with st.expander("🛠️ Debug MP Config (Safe View)"):
+        def mask(s): return f"{s[:6]}...{s[-4:]}" if len(s) > 10 else "N/A"
+        st.write(f"**MP_ACCESS_TOKEN:** {mask(config.MP_ACCESS_TOKEN)}")
+        st.write(f"**MP_PUBLIC_KEY:** {mask(config.MP_PUBLIC_KEY)}")
+        st.write(f"**BASE_URL:** {config.BASE_URL}")
+
     if st.button("⬅ Voltar", key="sub_back"):
         st.session_state['pagina'] = 'inicio'
         st.rerun()
