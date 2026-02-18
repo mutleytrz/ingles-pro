@@ -533,6 +533,11 @@ def render_pronunciation_coach(username: str):
 <div style="font-size:20px; font-weight:600; color:#f8fafc;">{ouvida.upper()}</div>
 </div>""", unsafe_allow_html=True)
 
+        # Áudio do próprio aluno (Revolutionary Feature 🚀)
+        st.markdown("""
+<div style="font-size:12px; color:#a78bfa; font-weight:700; letter-spacing:1px; margin-bottom:4px;">🔊 COMO VOCÊ SOOU:</div>""", unsafe_allow_html=True)
+        st.audio(gravacao['bytes'], format='audio/wav')
+
         # Score grande
         _pct_class = "background:linear-gradient(135deg,#34d399,#06b6d4,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;" if analysis["score"] >= 80 else "color:#f43f5e;"
         st.markdown(f"""
