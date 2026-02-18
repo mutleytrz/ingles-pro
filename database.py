@@ -630,7 +630,8 @@ def get_all_users_detailed() -> list[dict]:
     # Join users and progress
     try:
         query = """
-            SELECT u.id, u.username, u.name, u.email, u.is_admin, u.is_premium, u.plan_type, u.premium_until, p.xp 
+            SELECT u.id, u.username, u.name, u.email, u.is_admin, u.is_premium, u.plan_type, u.premium_until, p.xp,
+            (SELECT payment_id FROM payments WHERE username = u.username AND (status = 'success' OR status = 'approved') ORDER BY created_at DESC LIMIT 1) as last_payment_id
             FROM users u
             LEFT JOIN progress p ON u.username = p.username
             ORDER BY u.id ASC

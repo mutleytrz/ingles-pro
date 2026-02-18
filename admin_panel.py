@@ -126,6 +126,11 @@ def _render_user_management(current_admin_user: str):
             
             if until:
                 st.caption(f"Expira: {until[:10]}")
+            
+            # Show payment info if exists
+            p_id = u.get('last_payment_id') # I need to make sure this is in the detailed view
+            if p_id:
+                st.markdown(f"<code style='font-size:10px; opacity:0.7;'>ID: {p_id}</code>", unsafe_allow_html=True)
 
         # Actions
         with c7:
@@ -139,11 +144,15 @@ def _render_user_management(current_admin_user: str):
                 database.get_all_users_detailed.clear()
                 st.rerun()
 
-            # is_premium toggle
-            is_prem = bool(u.get('is_premium', 0))
-            new_prem = st.checkbox("Prem", value=is_prem, key=f"is_prem_{_uname}")
-            if new_prem != is_prem:
-                database.update_user_premium(_uname, new_prem, plan_type="manual" if new_prem else "free")
+            # Plan selector
+            plan_options = ["FREE", "MENSAL", "ANUAL", "VITALICIO", "MANUAL"]
+            current_plan = u.get('plan_type', 'free').upper()
+            if current_plan not in plan_options: current_plan = "FREE"
+            
+            new_plan = st.selectbox("Plano", options=plan_options, index=plan_options.index(current_plan), key=f"plan_{_uname}")
+            if new_plan != current_plan:
+                is_p = (new_plan != "FREE")
+                database.update_user_premium(_uname, is_p, plan_type=new_plan.lower())
                 st.rerun()
 
             # reset/delete/expiry
