@@ -1005,6 +1005,175 @@ def aplicar_estilo() -> None:
         to { opacity: 1; transform: translateY(0); }
     }
 
+    /* ============================================
+       RESPONSIVE — TABLET (≤ 1024px)
+       ============================================ */
+    @media screen and (max-width: 1024px) {
+        .block-container { padding-top: 1rem !important; max-width: 100% !important; }
+        .hero-title, .home-hero-wrap .hero-title {
+            font-size: 42px !important; line-height: 1.1 !important;
+        }
+        .hero-subtitle, .home-hero-wrap .hero-subtitle { font-size: 16px !important; }
+        .img-premium-wrap { height: 340px; }
+        .phrase-box { padding: 32px 24px; }
+        .feature-row { flex-direction: column; }
+        .metric-hero { padding: 32px; border-radius: 20px; }
+        .metric-hero h1 { font-size: 56px !important; }
+        .result-pct { font-size: 56px; }
+        .prova-resultado-wrap .score-big { font-size: 56px; }
+        .module-cover-wrap { height: 140px; }
+        .stat-card { padding: 20px 18px; min-width: 120px; }
+        .ft-card { padding: 24px 20px; gap: 18px; }
+        .ft-icon-ring { width: 56px; height: 56px; min-width: 56px; font-size: 26px; border-radius: 16px; }
+    }
+
+    /* ============================================
+       RESPONSIVE — MOBILE (≤ 768px)
+       ============================================ */
+    @media screen and (max-width: 768px) {
+        .block-container { padding: 0.5rem 0.5rem !important; max-width: 100% !important; }
+
+        /* Navbar compact */
+        .top-nav {
+            padding: 10px 14px; border-radius: 14px; margin-bottom: 20px;
+            flex-wrap: wrap; gap: 8px;
+        }
+        .app-logo { font-size: 17px; gap: 2px; }
+        .user-pill { padding: 5px 5px 5px 10px; gap: 8px; }
+        .user-pill span { font-size: 12px; }
+        .xp-badge { font-size: 11px; padding: 5px 10px; }
+        .xp-count { font-size: 12px; }
+        .xp-tier-badge { font-size: 10px; padding: 4px 10px; }
+
+        /* Login */
+        [data-testid="stForm"] {
+            padding: 24px 16px; border-radius: 20px;
+        }
+        [data-testid="stTextInput"] input {
+            padding: 12px 14px !important; font-size: 14px !important; border-radius: 11px !important;
+        }
+
+        /* Hero text shrink */
+        .hero-title, .home-hero-wrap .hero-title {
+            font-size: 28px !important; line-height: 1.15 !important;
+            margin: 16px 0 10px !important;
+        }
+        .hero-highlight { background-size: 300% 300%; }
+        .hero-subtitle, .home-hero-wrap .hero-subtitle {
+            font-size: 14px !important; line-height: 1.5 !important;
+        }
+        .hero-badge { font-size: 10px; padding: 4px 14px; letter-spacing: 1.5px; }
+
+        /* Stats grid */
+        .stats-grid { gap: 12px; margin-top: 28px; }
+        .stat-card {
+            padding: 16px 12px; border-radius: 14px; min-width: 0; flex: 1 1 40%;
+        }
+        .stat-number { font-size: 26px; }
+        .stat-label { font-size: 10px; letter-spacing: 1.5px; }
+
+        /* Feature cards */
+        .feature-row { flex-direction: column; gap: 14px; }
+        .ft-card {
+            padding: 20px 16px; gap: 14px; border-radius: 18px;
+            flex-direction: row; align-items: center;
+        }
+        .ft-icon-ring {
+            width: 48px; height: 48px; min-width: 48px;
+            font-size: 22px; border-radius: 14px;
+        }
+        .ft-title { font-size: 16px; }
+        .ft-desc { font-size: 13px; }
+        .ft-arrow { display: none; }
+        .feature-card {
+            padding: 24px 20px; border-radius: 18px;
+        }
+        .card-icon { width: 48px; height: 48px; font-size: 22px; border-radius: 14px; margin-bottom: 14px; }
+        .card-title { font-size: 17px; }
+        .card-desc { font-size: 13px; }
+
+        /* Module cards */
+        .module-cover-wrap { height: 120px; }
+        .module-card-inner { border-radius: 18px; }
+        .module-info { padding: 16px; }
+        .module-name { font-size: 15px; gap: 8px; margin-bottom: 10px; }
+        .mod-prog-bar { height: 5px; }
+        .mod-meta { font-size: 11px; }
+        .mod-sel-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+        .mod-sel-header h2 { font-size: 22px !important; }
+
+        /* Lesson UI */
+        .img-premium-wrap { height: 200px; border-radius: 18px; }
+        .phrase-box { padding: 24px 16px; border-radius: 18px; min-height: 200px; }
+        .phrase-en { font-size: 20px; margin: 14px 0; line-height: 1.3; }
+        .phrase-pt { font-size: 14px; padding: 5px 14px; }
+        .fb-container { gap: 6px; margin-top: 18px; }
+        .fb-word { padding: 7px 14px; font-size: 14px; border-radius: 10px; }
+        .ouvi-box { padding: 14px 16px; border-radius: 12px; }
+        .ouvi-text { font-size: 18px; }
+        .ouvi-label { font-size: 10px; }
+
+        /* Result screens */
+        .result-pct { font-size: 48px; margin: 18px 0; }
+        .metric-hero { padding: 24px 16px; border-radius: 18px; margin-bottom: 28px; }
+        .metric-hero h1 { font-size: 42px !important; }
+        .metric-label { font-size: 11px; letter-spacing: 2px; }
+        .mod-metric-card { padding: 16px; border-radius: 14px; }
+
+        /* Progress bar */
+        .prog-track { height: 8px; margin-bottom: 18px; }
+
+        /* Lesson header */
+        .lesson-header h3 { font-size: 20px !important; }
+        .lesson-header .lesson-count { font-size: 12px; }
+
+        /* Prova oral */
+        .prova-header h2 { font-size: 22px !important; }
+        .prova-resultado-wrap { padding: 28px 16px; border-radius: 16px; max-width: 100%; }
+        .prova-resultado-wrap .score-big { font-size: 48px; }
+        .prova-resultado-wrap .score-label { font-size: 14px; }
+
+        /* Section divider */
+        .section-divider { margin: 30px 0 24px; }
+        .section-divider .label { font-size: 11px; letter-spacing: 1.5px; }
+
+        /* Buttons */
+        div.stButton > button {
+            padding: 12px 20px; font-size: 14px; border-radius: 12px;
+        }
+
+        /* Divider */
+        .divider-glow { margin: 24px 0; }
+
+        /* CTA */
+        .cta-wrap { gap: 10px; margin-top: 24px; }
+
+        /* Metrics header */
+        .metrics-header h2 { font-size: 24px !important; }
+        .metrics-header .subtitle { font-size: 13px; }
+
+        /* Login page large title */
+        div[style*="font-size:72px"] { font-size: 40px !important; }
+        div[style*="font-size:26px"] h2 { font-size: 20px !important; }
+    }
+
+    /* ============================================
+       RESPONSIVE — SMALL MOBILE (≤ 480px)
+       ============================================ */
+    @media screen and (max-width: 480px) {
+        .hero-title, .home-hero-wrap .hero-title {
+            font-size: 24px !important;
+        }
+        .img-premium-wrap { height: 160px; }
+        .phrase-en { font-size: 18px; }
+        .stat-card { flex: 1 1 100%; }
+        .top-nav { justify-content: center; }
+        .module-cover-wrap { height: 100px; }
+        .result-pct { font-size: 40px; }
+        .metric-hero h1 { font-size: 36px !important; }
+        .prova-resultado-wrap .score-big { font-size: 40px; }
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1244,9 +1413,6 @@ elif st.session_state['pagina'] == 'admin_panel':
         st.error("Acesso negado.")
     else:
         admin_panel.render_admin_panel(username, test_oral_callback=lambda: _trigger_oral_test(username))
-        if st.button("⬅ Voltar ao App"):
-            st.session_state['pagina'] = 'inicio'
-            st.rerun()
 
 elif st.session_state['pagina'] == 'assinatura':
     # Subscription / Payment Page

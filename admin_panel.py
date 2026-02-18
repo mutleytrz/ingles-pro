@@ -6,24 +6,41 @@ import streamlit_authenticator as stauth
 
 def render_admin_panel(username: str, test_oral_callback=None):
     """Renderiza o painel ADM completo."""
-    st.markdown("""
-    <div style="background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.3); padding:20px; border-radius:12px; margin-bottom:30px;">
-        <h2 style="color:#f87171; margin:0; display:flex; align-items:center; gap:10px;">🛡️ PAINEL DE ADMINISTRADOR</h2>
-        <p style="color:#fca5a5; margin:5px 0 0;">God Mode & User Management</p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    tab1, tab2 = st.tabs(["👥 Gerenciar Usuários", "⚡ Ferramentas de Teste"])
+    # ===== BOTAO VOLTAR NO TOPO (SEMPRE VISIVEL) =====
+    _back_col, _title_col = st.columns([1, 5])
+    with _back_col:
+        if st.button("⬅ Voltar ao App", key="admin_back_top", use_container_width=True):
+            st.session_state['pagina'] = 'inicio'
+            st.rerun()
+
+    with _title_col:
+        st.markdown("""
+        <div style="background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.3); padding:20px; border-radius:12px;">
+            <h2 style="color:#f87171; margin:0; display:flex; align-items:center; gap:10px;">🛡️ PAINEL DE ADMINISTRADOR</h2>
+            <p style="color:#fca5a5; margin:5px 0 0;">God Mode & User Management</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    tab1, tab2, tab3 = st.tabs(["👥 Gerenciar Usuários", "📊 Evolução dos Alunos", "⚡ Ferramentas de Teste"])
 
     with tab1:
         _render_user_management(username)
 
     with tab2:
+        _render_student_analytics()
+
+    with tab3:
         _render_tester_tools(test_oral_callback)
 
 
 def _render_user_management(current_admin_user: str):
     st.markdown("### Lista de Usuários")
+    
+    # Botao para forcar refresh da lista
+    if st.button("🔄 Atualizar Lista", key="refresh_users"):
+        database.get_all_users_detailed.clear()
+        st.rerun()
     
     users = database.get_all_users_detailed()
     if not users:
@@ -58,48 +75,45 @@ def _render_user_management(current_admin_user: str):
                  if st.button("💾", key=f"save_xp_{u['username']}"):
                      database.update_user_xp(u['username'], int(new_xp))
                      # FIX: Se estiver editando a si mesmo, atualiza a sessao imediatamente
-                     # caso contrario, o proximo salvar_progresso() vai sobrescrever o banco com o valor antigo
                      if is_self:
                         st.session_state['xp'] = int(new_xp)
                      
+                     database.get_all_users_detailed.clear()
                      st.toast(f"XP de {u['username']} atualizado!")
                      st.rerun()
 
         # Actions
         with c6:
+            _uname = u['username']
+
             # is_admin toggle
-            is_adm = bool(u['is_admin'])
-            if st.checkbox("Admin", value=is_adm, key=f"is_adm_{u['username']}", disabled=is_self):
-                if not is_adm:
-                    database.update_user_role(u['username'], True)
-                    st.toast(f"{u['username']} agora é Admin!")
-                    st.rerun()
-            else:
-                if is_adm:
-                    database.update_user_role(u['username'], False)
-                    st.toast(f"{u['username']} removido de Admin.")
-                    st.toast(f"{u['username']} removido de Admin.")
-                    st.rerun()
+            is_adm = bool(u.get('is_admin', 0))
+            new_adm = st.checkbox("Admin", value=is_adm, key=f"is_adm_{_uname}", disabled=is_self)
+            if new_adm != is_adm:
+                database.update_user_role(_uname, new_adm)
+                database.get_all_users_detailed.clear()
+                st.toast(f"Admin de {_uname}: {'ATIVADO' if new_adm else 'REMOVIDO'}")
+                st.rerun()
 
             # is_premium toggle
             is_prem = bool(u.get('is_premium', 0))
-            new_prem = st.checkbox("Premium", value=is_prem, key=f"is_prem_{u['username']}")
+            new_prem = st.checkbox("Premium", value=is_prem, key=f"is_prem_{_uname}")
             if new_prem != is_prem:
-                database.update_user_premium(u['username'], new_prem)
-                st.toast(f"Status Premium de {u['username']}: {'ATIVADO' if new_prem else 'REMOVIDO'}")
+                database.update_user_premium(_uname, new_prem)
+                st.toast(f"Premium de {_uname}: {'ATIVADO ✅' if new_prem else 'REMOVIDO ❌'}")
                 # Update session state if modifying self
-                if is_self:
+                if is_self and 'usuario' in st.session_state:
                     st.session_state['usuario']['is_premium'] = new_prem
                 st.rerun()
 
             # Password Reset
-            if st.button("🔑", key=f"pwd_{u['username']}", help="Resetar Senha"):
-                _reset_password_dialog(u['username'])
+            if st.button("🔑", key=f"pwd_{_uname}", help="Resetar Senha"):
+                _reset_password_dialog(_uname)
             
             # Delete User
             if not is_self:
-                if st.button("🗑️", key=f"del_{u['username']}", help="Excluir Usuário"):
-                    _delete_user_dialog(u['username'])
+                if st.button("🗑️", key=f"del_{_uname}", help="Excluir Usuário"):
+                    _delete_user_dialog(_uname)
 
     st.divider()
 
@@ -135,6 +149,163 @@ def _reset_password_dialog(target_username: str):
         database.update_user_password(target_username, hashed)
         st.success("Senha alterada com sucesso!")
         st.rerun()
+
+
+# ========================================================================
+# TAB: EVOLUÇÃO DOS ALUNOS
+# ========================================================================
+def _render_student_analytics():
+    st.markdown("### 📊 Acompanhamento Individual de Alunos")
+
+    users = database.get_all_users_detailed()
+    if not users:
+        st.info("Nenhum usuário encontrado.")
+        return
+
+    # Dropdown para selecionar aluno
+    user_options = {f"{u['username']} — {u['name']}": u['username'] for u in users}
+    selected_label = st.selectbox("Selecione o aluno:", list(user_options.keys()), key="analytics_user_select")
+    selected_user = user_options[selected_label]
+
+    # Busca analytics completo
+    data = database.get_student_analytics(selected_user)
+
+    # --- Header: XP e Tier ---
+    xp = data.get('xp', 0)
+    # Importar a funcao de tier do app_core via indireta (evita import circular)
+    tiers = [
+        (0, "Novato", "#64748b", "🌱"),
+        (100, "Aprendiz", "#22c55e", "📗"),
+        (500, "Intermediário", "#3b82f6", "📘"),
+        (1500, "Avançado", "#8b5cf6", "📙"),
+        (3000, "Expert", "#f59e0b", "🏆"),
+        (5000, "Mestre", "#ef4444", "👑"),
+    ]
+    tier_name, tier_color, tier_emoji = "Novato", "#64748b", "🌱"
+    for threshold, name, color, emoji in tiers:
+        if xp >= threshold:
+            tier_name, tier_color, tier_emoji = name, color, emoji
+
+    st.markdown(f"""
+    <div style="background:linear-gradient(135deg, rgba(139,92,246,0.1), rgba(6,182,212,0.05));
+                border:1px solid rgba(139,92,246,0.2); border-radius:16px; padding:24px; margin:16px 0;">
+        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+            <div style="font-size:42px; font-weight:900; color:#f1f5f9;">⭐ {xp} XP</div>
+            <div style="background:rgba(139,92,246,0.15); padding:8px 16px; border-radius:99px;
+                        color:{tier_color}; font-weight:700; border:1px solid {tier_color}33;">
+                {tier_emoji} {tier_name}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- Progresso por Módulo ---
+    st.markdown("#### 📂 Progresso por Módulo")
+
+    mod_progress = data.get('module_progress', {})
+    lesson_scores = data.get('lesson_scores', {})
+    modulos = config.MODULOS
+
+    if not mod_progress:
+        st.caption("Este aluno ainda não iniciou nenhum módulo.")
+    else:
+        for titulo, arquivo, _url in modulos:
+            # Carregar dados do CSV para saber o total de lições
+            try:
+                import pandas as pd
+                import os
+                csv_path = os.path.join(config.CSV_DIR, arquivo)
+                if os.path.exists(csv_path):
+                    df = pd.read_csv(csv_path, on_bad_lines='skip', encoding='utf-8')
+                    total_licoes = len(df)
+                else:
+                    total_licoes = 0
+            except Exception:
+                total_licoes = 0
+
+            indice = mod_progress.get(arquivo, 0)
+            if indice == 0 and arquivo not in mod_progress:
+                continue  # Pula módulos não iniciados
+
+            pct = min(int((indice / total_licoes) * 100), 100) if total_licoes > 0 else 0
+            emoji = config.MODULOS_EMOJI.get(titulo, '📚')
+            status = '✅ COMPLETO' if pct >= 100 else '🔄 EM CURSO'
+
+            # Barra de progresso
+            bar_color = "linear-gradient(90deg, #22c55e, #10b981)" if pct >= 100 else "linear-gradient(90deg, #8b5cf6, #06b6d4)"
+            st.markdown(f"""
+            <div style="background:rgba(15,10,40,0.4); border:1px solid rgba(139,92,246,0.15);
+                        border-radius:12px; padding:16px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-weight:700; font-size:15px; color:#e2e8f0;">{emoji} {titulo}</span>
+                    <span style="color:#06b6d4; font-weight:700; font-size:14px;">{pct}% — {status}</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.06); border-radius:6px; height:8px; overflow:hidden;">
+                    <div style="height:100%; width:{pct}%; background:{bar_color}; border-radius:6px;
+                                transition:width 0.5s ease;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:12px; color:#94a3b8;">
+                    <span>Lição {indice}/{total_licoes}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Scores de lições deste módulo (se houver)
+            mod_scores = lesson_scores.get(arquivo, {})
+            if mod_scores:
+                _scores_html_parts = []
+                for idx in sorted(mod_scores.keys()):
+                    score = mod_scores[idx]
+                    bg = "#22c55e" if score >= 80 else ("#f59e0b" if score >= 50 else "#ef4444")
+                    _scores_html_parts.append(
+                        f'<span style="display:inline-block; padding:3px 8px; margin:2px; '
+                        f'border-radius:6px; font-size:11px; font-weight:600; '
+                        f'background:{bg}22; color:{bg}; border:1px solid {bg}44;">'
+                        f'L{idx+1}: {score}%</span>'
+                    )
+                st.markdown(
+                    '<div style="margin:-6px 0 10px 16px;">' + ''.join(_scores_html_parts) + '</div>',
+                    unsafe_allow_html=True,
+                )
+
+    # --- Palavras com Dificuldade ---
+    st.markdown("#### 🔴 Palavras com Dificuldade")
+
+    weak_words = data.get('weak_words', [])
+    if not weak_words:
+        st.caption("Nenhuma dificuldade registrada ainda.")
+    else:
+        # Tabela de palavras com erros
+        st.markdown("""
+        <div style="background:rgba(15,10,40,0.4); border:1px solid rgba(239,68,68,0.2);
+                    border-radius:12px; padding:16px; margin-bottom:10px;">
+            <div style="display:flex; gap:10px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.06);
+                        font-size:12px; color:#94a3b8; font-weight:600;">
+                <div style="flex:2;">PALAVRA</div>
+                <div style="flex:1; text-align:center;">ERROS</div>
+                <div style="flex:1; text-align:center;">VEZES VISTA</div>
+                <div style="flex:1; text-align:center;">TAXA DE ERRO</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        for w in weak_words[:20]:  # Limita a 20
+            word = w.get('word', '?')
+            errors = w.get('error_count', 0)
+            total = w.get('total_seen', 1)
+            rate = int((errors / total) * 100) if total > 0 else 0
+            rate_color = "#ef4444" if rate >= 60 else ("#f59e0b" if rate >= 30 else "#22c55e")
+
+            st.markdown(f"""
+            <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.03);
+                        font-size:14px; color:#e2e8f0;">
+                <div style="flex:2; font-weight:600;">{word}</div>
+                <div style="flex:1; text-align:center; color:#ef4444; font-weight:700;">{errors}</div>
+                <div style="flex:1; text-align:center; color:#94a3b8;">{total}</div>
+                <div style="flex:1; text-align:center; color:{rate_color}; font-weight:700;">{rate}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_tester_tools(test_oral_callback=None):

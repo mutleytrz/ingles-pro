@@ -367,6 +367,8 @@ def update_user_premium(username: str, is_premium: bool) -> None:
         (1 if is_premium else 0, username),
     )
     conn.commit()
+    # Limpa cache para refletir a mudanca imediatamente
+    get_all_users_detailed.clear()
 
 
 def update_user_xp(username: str, xp: int) -> None:
@@ -387,14 +389,14 @@ def update_user_xp(username: str, xp: int) -> None:
     conn.commit()
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=10, show_spinner=False)
 def get_all_users_detailed() -> list[dict]:
-    """Retorna lista completa de usuarios com XP e status Admin."""
+    """Retorna lista completa de usuarios com XP, status Admin e Premium."""
     conn = _get_conn()
     # Join users and progress
     try:
         query = """
-            SELECT u.id, u.username, u.name, u.email, u.is_admin, p.xp 
+            SELECT u.id, u.username, u.name, u.email, u.is_admin, u.is_premium, p.xp 
             FROM users u
             LEFT JOIN progress p ON u.username = p.username
             ORDER BY u.id ASC
@@ -561,6 +563,58 @@ def get_weak_words(username: str, limit: int = 30) -> list[dict]:
     except Exception as e:
         print(f"[ERR] get_weak_words: {e}")
         return []
+
+
+def get_student_analytics(username: str) -> dict:
+    """Retorna analytics completo de um aluno para o painel admin.
+    Inclui: progresso por modulo, scores por licao, e palavras fracas."""
+    conn = _get_conn()
+    result = {
+        'module_progress': {},
+        'lesson_scores': {},
+        'weak_words': [],
+        'xp': 0,
+    }
+    try:
+        # XP
+        xp_row = conn.execute(
+            "SELECT xp FROM progress WHERE username = ?", (username,)
+        ).fetchone()
+        if xp_row:
+            result['xp'] = xp_row['xp'] or 0
+
+        # Progresso por modulo {module_file: indice}
+        mod_rows = conn.execute(
+            "SELECT module_file, indice FROM module_progress WHERE username = ?",
+            (username,),
+        ).fetchall()
+        result['module_progress'] = {r['module_file']: r['indice'] for r in mod_rows}
+
+        # Scores por licao {(module_file, lesson_idx): best_score}
+        score_rows = conn.execute(
+            "SELECT module_file, lesson_idx, best_score FROM lesson_scores WHERE username = ?",
+            (username,),
+        ).fetchall()
+        scores_dict = {}
+        for r in score_rows:
+            mod = r['module_file']
+            if mod not in scores_dict:
+                scores_dict[mod] = {}
+            scores_dict[mod][r['lesson_idx']] = r['best_score']
+        result['lesson_scores'] = scores_dict
+
+        # Palavras fracas (todas, sem filtro de minimo)
+        word_rows = conn.execute("""
+            SELECT word, error_count, total_seen
+            FROM word_errors
+            WHERE username = ? AND error_count >= 1
+            ORDER BY error_count DESC
+            LIMIT 50
+        """, (username,)).fetchall()
+        result['weak_words'] = [dict(r) for r in word_rows]
+    except Exception as e:
+        print(f"[ERR] get_student_analytics: {e}")
+    return result
 
 
 def delete_user(username: str) -> bool:

@@ -72,6 +72,13 @@ TURSO_AUTH_TOKEN: str = _get("TURSO_AUTH_TOKEN", "")
 
 # -- Seguranca --
 SECRET_KEY: str = _get("SECRET_KEY", "CHANGE_ME_IN_PRODUCTION")
+if SECRET_KEY == "CHANGE_ME_IN_PRODUCTION":
+    import warnings
+    warnings.warn(
+        "⚠️ SEGURANÇA: SECRET_KEY está com o valor padrão! "
+        "Defina SECRET_KEY em variáveis de ambiente, st.secrets, ou config.json.",
+        stacklevel=2,
+    )
 
 # -- Email (SMTP) --
 SMTP_HOST: str = _get("SMTP_HOST", "")

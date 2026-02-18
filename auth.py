@@ -152,6 +152,16 @@ def render_register():
         if not new_user or not new_name or not new_pass:
             st.error("⚠️ Preencha todos os campos obrigatórios (Usuário, Nome, Senha).")
             return
+        # Sanitização de username: só alfanumérico e underscore
+        import re
+        if not re.match(r'^[a-zA-Z0-9_]{3,30}$', new_user):
+            st.error("⚠️ Usuário deve ter 3-30 caracteres (letras, números ou _).")
+            return
+        if len(new_name.strip()) < 2:
+            st.error("⚠️ Nome deve ter pelo menos 2 caracteres.")
+            return
+        new_user = new_user.strip().lower()
+        new_name = new_name.strip()
         if new_pass != new_pass2:
             st.error("⚠️ As senhas não coincidem.")
             return
