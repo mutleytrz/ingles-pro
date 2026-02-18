@@ -431,10 +431,11 @@ def render_pronunciation_coach(username: str):
 <span style="font-size:14px; color:#94a3b8;">Frase {idx+1} de {total}</span>
 </div>""", unsafe_allow_html=True)
     with c_nav2:
-        if st.button("Próxima ➡", key="coach_next"):
-            st.session_state["coach_idx"] = idx + 1
-            st.session_state["coach_attempt"] = 0
-            st.rerun()
+        if idx < total - 1:
+            if st.button("Próxima ➡", key="coach_next"):
+                st.session_state["coach_idx"] = idx + 1
+                st.session_state["coach_attempt"] = 0
+                st.rerun()
     with c_exit:
         if st.button("❌ Sair", key="coach_exit"):
             st.session_state["coach_module"] = None
@@ -454,7 +455,7 @@ def render_pronunciation_coach(username: str):
 <div style="background:rgba(15,10,40,0.55); backdrop-filter:blur(16px); border:1px solid rgba(6,182,212,0.2); border-radius:24px; padding:36px; text-align:center; position:relative; overflow:hidden; margin-bottom:24px;">
 <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#06b6d4,#8b5cf6,#ec4899);"></div>
 
-<div style="font-size:13px; color:#94a3b8; margin-bottom:8px; font-weight:500;">
+<div style="font-size:20px; color:#94a3b8; margin-bottom:8px; font-weight:500;">
 <img src="https://flagcdn.com/w40/br.png" style="width:24px; height:24px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-right:8px; border:2px solid rgba(255,255,255,0.1);">
 {frase_pt}
 </div>
@@ -604,15 +605,17 @@ def render_pronunciation_coach(username: str):
                 st.session_state["coach_attempt"] += 1
                 st.rerun()
         with c2:
-            if analysis["score"] >= 50:
-                if st.button("➡️ PRÓXIMA FRASE", key="coach_next_after", use_container_width=True):
+            # Free navigation - button always active if not last phrase
+            if idx < total - 1:
+                 if st.button("➡️ PRÓXIMA FRASE", key="coach_next_after", use_container_width=True):
                     st.session_state["coach_idx"] = idx + 1
                     st.session_state["coach_attempt"] = 0
                     st.rerun()
             else:
-                st.button("➡️ PRÓXIMA FRASE", key="coach_next_after_disabled",
-                          use_container_width=True, disabled=True,
-                          help="Alcance pelo menos 50% para avançar")
+                 if st.button("🏁 FINALIZAR", key="coach_finish_after", use_container_width=True):
+                    # Trigger completion screen manually if needed, or loop
+                    st.session_state["coach_idx"] = total # Force complete
+                    st.rerun()
 
         # Audio da palavra errada (repete isoladamente)
         errors = [r for r in analysis["results"] if not r["correct"]]
