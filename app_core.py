@@ -27,6 +27,7 @@ import admin_panel
 import neural_sleep
 import pronunciation_coach
 import payments
+import email_service
 
 # -- Inicializa banco de dados (Apenas uma vez) --
 @st.cache_resource
@@ -1235,15 +1236,8 @@ model_vosk = carregar_vosk()
 
 
 
-# ========================================================
-# AUTENTICACAO
-# ========================================================
-# ========================================================
-username = auth.render_login()
-if username is None:
-    st.stop()
-
 # -- CHECK FOR PAYMENT STATUS (Mercado Pago Return) --
+# This block must run BEFORE render_login() to allow activation even if logged out
 query_params = st.query_params
 if "payment_status" in query_params:
     status = query_params["payment_status"]
@@ -1258,37 +1252,43 @@ if "payment_status" in query_params:
                 if "|" in ext_ref:
                     user_ref, plan_ref = ext_ref.split("|", 1)
                 else:
-                    user_ref, plan_ref = username, "vitalicio" # fallback
+                    user_ref, plan_ref = "unknown", "vitalicio" # fallback
                 
                 # Preco pago
                 amount_paid = float(p_data.get("transaction_amount", 97.90))
                 
+                # Ativa no banco
                 database.update_user_premium(user_ref, True, plan_type=plan_ref)
                 database.log_payment(user_ref, payment_id, "success", amount_paid, "BRL", plan_ref)
                 
+                # Envia Email de Confirmação
+                user_info = database.get_user(user_ref)
+                if user_info and user_info.get("email"):
+                    email_service.send_payment_success_email(
+                        user_info["email"], 
+                        user_info["name"], 
+                        plan_ref, 
+                        user_info.get("premium_until")
+                    )
+
                 st.success(f"🎉 PARABÉNS! Seu Plano {plan_ref.upper()} foi ativado com sucesso!")
                 st.query_params.clear()
-                if "_st" in locals() and _st:
-                     st.query_params["session"] = _st
-                
-                if 'usuario' in st.session_state:
-                    st.session_state['usuario']['is_premium'] = True
-                    st.session_state['usuario']['plan_type'] = plan_ref
-                
-                time.sleep(2)
                 st.rerun()
             else:
                 st.error("⚠️ Não conseguimos confirmar seu pagamento como aprovado.")
     elif status == "failure":
-        if payment_id:
-            database.log_payment(username, payment_id, "failure", 0.0)
         st.error("❌ O pagamento foi recusado ou cancelado.")
         st.query_params.clear()
     elif status == "pending":
-        if payment_id:
-            database.log_payment(username, payment_id, "pending", 0.0)
         st.warning("⏳ Pagamento pendente. Seu Premium será ativado em breve.")
         st.query_params.clear()
+
+# ========================================================
+# AUTENTICACAO
+# ========================================================
+username = auth.render_login()
+if username is None:
+    st.stop()
 
 # -----------------------------------------------------------
 # CARREGAR DADOS DO USUÁRIO (CRÍTICO: ANTES DA RENDERIZAÇÃO)
@@ -1583,13 +1583,6 @@ elif st.session_state['pagina'] == 'assinatura':
                     if url: st.markdown(f'<meta http-equiv="refresh" content="0; url={url}">', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- DEBUG SECTION (Temporary) ---
-    with st.expander("🛠️ Debug MP Config (Safe View)"):
-        def mask(s): return f"{s[:6]}...{s[-4:]}" if len(s) > 10 else "N/A"
-        st.write(f"**MP_ACCESS_TOKEN:** {mask(config.MP_ACCESS_TOKEN)}")
-        st.write(f"**MP_PUBLIC_KEY:** {mask(config.MP_PUBLIC_KEY)}")
-        st.write(f"**BASE_URL:** {config.BASE_URL}")
 
     if st.button("⬅ Voltar", key="sub_back"):
         st.session_state['pagina'] = 'inicio'

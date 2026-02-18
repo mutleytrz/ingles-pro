@@ -101,3 +101,82 @@ def send_verification_email(to_email: str, code: str) -> bool:
     except Exception as e:
         print(f"[ERR] Falha ao enviar email: {e}")
         return False
+
+def send_payment_success_email(to_email: str, name: str, plan_type: str, expiry_date: str | None) -> bool:
+    """Envia email de confirmação de compra."""
+    smtp = _get_smtp_runtime()
+    if not smtp["host"] or not smtp["user"]: return True
+
+    plan_name = plan_type.upper()
+    expiry_str = f"Sua assinatura é válida até: <b>{expiry_date[:10]}</b>" if expiry_date else "Sua assinatura é <b>Vitalícia</b>!"
+
+    html = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #334155;">
+        <div style="max-width: 600px; margin: 20px auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px;">
+          <h1 style="color: #8b5cf6;">🎉 Pagamento Expandido!</h1>
+          <p>Olá <b>{name}</b>,</p>
+          <p>Seu acesso ao <b>English Pro</b> foi ativado com sucesso!</p>
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0;">Plano: <b>{plan_name}</b></p>
+            <p style="margin: 5px 0 0;">{expiry_str}</p>
+          </div>
+          <p>Agora você já pode aproveitar todos os recursos premium.</p>
+          <a href="https://ingles-pro.streamlit.app" style="display: inline-block; background: #8b5cf6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">ACESSAR AGORA</a>
+          <p style="font-size: 12px; color: #94a3b8; margin-top: 30px;">Equipe English Pro AI</p>
+        </div>
+      </body>
+    </html>
+    """
+    
+    # Reutiliza estrutura de envio básico (simplificado aqui para o exemplo)
+    msg = MIMEMultipart("alternative")
+    from email.utils import formataddr
+    msg["Subject"] = f"🚀 Bem-vindo ao Premium! Plano {plan_name}"
+    msg["From"] = formataddr((smtp['from_name'], smtp['user']))
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP(smtp["host"], smtp["port"]) as server:
+            server.starttls(context=context)
+            server.login(smtp["user"], smtp["password"])
+            server.sendmail(smtp["user"], to_email, msg.as_string())
+        return True
+    except: return False
+
+def send_renewal_reminder_email(to_email: str, name: str, plan_type: str, expiry_date: str, days_left: int) -> bool:
+    """Envia lembrete de renovação."""
+    smtp = _get_smtp_runtime()
+    if not smtp["host"] or not smtp["user"]: return True
+
+    html = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #334155;">
+        <div style="max-width: 600px; margin: 20px auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px;">
+          <h2 style="color: #06b6d4;">⏰ Sua assinatura está vencendo</h2>
+          <p>Olá <b>{name}</b>,</p>
+          <p>Sua assinatura <b>{plan_type.upper()}</b> expira em <b>{days_left} dias</b> (dia {expiry_date[:10]}).</p>
+          <p>Para não perder o acesso ao seu progresso e às ferramentas de IA, renove agora mesmo no seu painel.</p>
+          <a href="https://ingles-pro.streamlit.app" style="display: inline-block; background: #06b6d4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">RENOVAR AGORA</a>
+          <p style="font-size: 12px; color: #94a3b8; margin-top: 30px;">Equipe English Pro AI</p>
+        </div>
+      </body>
+    </html>
+    """
+    msg = MIMEMultipart("alternative")
+    from email.utils import formataddr
+    msg["Subject"] = f"⚠️ Lembrete: Sua assinatura expira em {days_left} dias"
+    msg["From"] = formataddr((smtp['from_name'], smtp['user']))
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP(smtp["host"], smtp["port"]) as server:
+            server.starttls(context=context)
+            server.login(smtp["user"], smtp["password"])
+            server.sendmail(smtp["user"], to_email, msg.as_string())
+        return True
+    except: return False

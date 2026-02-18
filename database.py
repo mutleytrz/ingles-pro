@@ -539,6 +539,39 @@ def update_user_premium(username: str, is_premium: bool, plan_type: str = "free"
     get_all_users_detailed.clear()
     get_user.clear()
 
+def update_user_expiry(username: str, expiry_date: str | None) -> bool:
+    """Atualiza manualmente a data de expiração de um usuário."""
+    conn = _get_conn()
+    try:
+        conn.execute(
+            "UPDATE users SET premium_until = ? WHERE username = ?",
+            (expiry_date, username),
+        )
+        conn.commit()
+        get_all_users_detailed.clear()
+        return True
+    except Exception as e:
+        print(f"[ERR] update_user_expiry: {e}")
+        return False
+
+def get_expiring_users(days: int) -> list[dict]:
+    """Retorna usuários cujo premium_until expira em 'days' dias."""
+    conn = _get_conn()
+    try:
+        # Usando date() para comparar apenas a data
+        query = """
+            SELECT username, name, email, plan_type, premium_until 
+            FROM users 
+            WHERE is_premium = 1 
+              AND premium_until IS NOT NULL 
+              AND date(premium_until) = date('now', 'localtime', ?)
+        """
+        rows = conn.execute(query, (f"+{days} days",)).fetchall()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[ERR] get_expiring_users: {e}")
+        return []
+
 def log_payment(username: str, payment_id: str, status: str, amount: float, currency: str = "BRL", external_ref: str = ""):
     """Registra um log de pagamento na tabela payments."""
     conn = _get_conn()

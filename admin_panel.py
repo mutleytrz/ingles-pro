@@ -119,11 +119,13 @@ def _render_user_management(current_admin_user: str):
                 database.update_user_premium(_uname, new_prem, plan_type="manual" if new_prem else "free")
                 st.rerun()
 
-            # reset/delete
-            col_a, col_b = st.columns(2)
-            if col_a.button("🔑", key=f"pwd_{_uname}"):
+            # reset/delete/expiry
+            col_a, col_b, col_c = st.columns(3)
+            if col_a.button("🔑", key=f"pwd_{_uname}", help="Resetar Senha"):
                 _reset_password_dialog(_uname)
-            if not is_self and col_b.button("🗑️", key=f"del_{_uname}"):
+            if col_b.button("📅", key=f"exp_{_uname}", help="Data de Expiração"):
+                _edit_expiry_dialog(_uname, u.get('premium_until'))
+            if not is_self and col_c.button("🗑️", key=f"del_{_uname}", help="Excluir Usuário"):
                 _delete_user_dialog(_uname)
 
     st.divider()
@@ -137,6 +139,33 @@ def _delete_user_dialog(target_username: str):
     if st.button("Sim, excluir permanentemente"):
         if database.delete_user(target_username):
             st.success(f"Usuário {target_username} excluído.")
+            st.rerun()
+
+
+@st.dialog("Gerenciar Expiração")
+def _edit_expiry_dialog(target_username: str, current_expiry: str | None):
+    st.markdown(f"Ajustando expiração para: **{target_username}**")
+    
+    # Prepara data atual para o date_input
+    from datetime import date, datetime
+    init_val = date.today()
+    if current_expiry:
+        try:
+            init_val = datetime.fromisoformat(current_expiry).date()
+        except: pass
+    
+    new_date = st.date_input("Nova Data de Expiração", value=init_val)
+    st.info("Deixe em branco ou mude o plano para Free para remover o acesso.")
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Salvar Data"):
+        if database.update_user_expiry(target_username, new_date.isoformat()):
+            st.success("Data atualizada!")
+            st.rerun()
+    
+    if col2.button("Remover Data"):
+        if database.update_user_expiry(target_username, None):
+            st.success("Expiração removida!")
             st.rerun()
         else:
             st.error("Erro ao excluir usuário.")
