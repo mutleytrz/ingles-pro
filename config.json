@@ -11,7 +11,7 @@
     "SMTP_USER": "",
     "SMTP_PASS": "",
     "SMTP_FROM_NAME": "English Pro AI",
-    "MP_ACCESS_TOKEN": "YOUR_MP_ACCESS_TOKEN",
-    "MP_PUBLIC_KEY": "YOUR_MP_PUBLIC_KEY",
+    "MP_ACCESS_TOKEN": "APP_USR-5952199546797346-021816-6d68a52f1f6a8df7dc549d9154ffec38-26293035",
+    "MP_PUBLIC_KEY": "APP_USR-34e65fc7-1df6-43d1-ba84-88909523e1d2",
     "BASE_URL": "https://ingles-pro-ud9k8jhbwxggsbwvgbh9k2.streamlit.app/"
 }
