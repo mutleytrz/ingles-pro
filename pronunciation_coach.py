@@ -455,9 +455,12 @@ def render_pronunciation_coach(username: str):
         st.session_state["coach_last_spoken"] = "Listen and repeat! 🎧"
 
     avatar_msg = st.session_state["coach_last_spoken"]
+    
+    # Placeholder para permitir atualização dinâmica sem rerun
+    avatar_placeholder = st.empty()
 
-    # CSS Animation for breathing/floating
-    st.markdown(f"""
+    def render_avatar(msg):
+        avatar_placeholder.markdown(f"""
 <style>
 @keyframes float {{
     0% {{ transform: translateY(0px); }}
@@ -530,9 +533,12 @@ def render_pronunciation_coach(username: str):
 </style>
 <div class="avatar-container">
     <img src="https://api.dicebear.com/9.x/notionists/svg?seed=Teacher&backgroundColor=b6e3f4" class="avatar-img">
-    <div class="speech-bubble">{avatar_msg}</div>
+    <div class="speech-bubble">{msg}</div>
 </div>
 """, unsafe_allow_html=True)
+
+    # Render inicial
+    render_avatar(avatar_msg)
 
     # --- CARD DA FRASE ---
     pronunciation_guide = get_pronunciation_guide(frase_en)
