@@ -27,8 +27,12 @@ import admin_panel
 import neural_sleep
 import pronunciation_coach
 
-# -- Inicializa banco de dados --
-database.init_db()
+# -- Inicializa banco de dados (Apenas uma vez) --
+@st.cache_resource
+def _init_db_once():
+    database.init_db()
+
+_init_db_once()
 
 # -- CONFIG --
 st.set_page_config(
