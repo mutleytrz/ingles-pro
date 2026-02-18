@@ -488,52 +488,9 @@ def render_pronunciation_coach(username: str):
     animation: float 6s ease-in-out infinite, pulse-ring 3s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
     object-fit: cover;
 }
-.speech-bubble {
-    position: absolute;
-    top: -20px;
-    right: 50%;
-    transform: translateX(155%);
-    background: #fff;
-    color: #0f172a;
-    padding: 18px 28px;
-    border-radius: 24px;
-    font-size: 19px;
-    font-weight: 700;
-    white-space: nowrap;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-    max-width: 400px;
-    min-width: 200px;
-    white-space: normal;
-    text-align: center;
-    border: 3px solid #22d3ee;
-    z-index: 20;
-    line-height: 1.4;
-}
-.speech-bubble::after {
-    content: '';
-    position: absolute;
-    left: -8px;
-    top: 50%;
-    transform: translateY(-50%);
-    border-style: solid;
-    border-width: 8px 8px 8px 0;
-    border-color: transparent #22d3ee transparent transparent;
-}
-.speech-bubble::before {
-    content: '';
-    position: absolute;
-    left: -5px;
-    top: 50%;
-    transform: translateY(-50%);
-    border-style: solid;
-    border-width: 8px 8px 8px 0;
-    border-color: transparent #fff transparent transparent;
-    z-index: 1;
-}
 </style>
 <div class="avatar-container">
     <img src="https://api.dicebear.com/9.x/notionists/svg?seed=Teacher&backgroundColor=b6e3f4" class="avatar-img">
-    <div class="speech-bubble">Listen and repeat! 🎧</div>
 </div>
 """, unsafe_allow_html=True)
 
