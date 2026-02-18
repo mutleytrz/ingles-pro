@@ -117,12 +117,8 @@ def _render_user_management(current_admin_user: str):
                 icon = "🧪"
                 badge_bg = "rgba(148,163,184,0.1)"
             
-            st.markdown(f"""
-                <div style="background:{badge_bg}; border:1px solid {color}33; padding:4px 10px; border-radius:8px; display:inline-block;">
-                    <span style="font-size:12px; margin-right:5px;">{icon}</span>
-                    <span style="color:{color}; font-weight:bold; font-size:12px;">{p_type}</span>
-                </div>
-            """, unsafe_allow_html=True)
+            badge_html = f'<div style="background:{badge_bg}; border:1px solid {color}33; padding:4px 10px; border-radius:8px; display:inline-block;"><span style="font-size:12px; margin-right:5px;">{icon}</span><span style="color:{color}; font-weight:bold; font-size:12px;">{p_type}</span></div>'
+            st.markdown(badge_html, unsafe_allow_html=True)
             
             if until:
                 st.caption(f"Expira: {until[:10]}")
@@ -262,18 +258,8 @@ def _render_student_analytics():
         if xp >= threshold:
             tier_name, tier_color, tier_emoji = name, color, emoji
 
-    st.markdown(f"""
-    <div style="background:linear-gradient(135deg, rgba(139,92,246,0.1), rgba(6,182,212,0.05));
-                border:1px solid rgba(139,92,246,0.2); border-radius:16px; padding:24px; margin:16px 0;">
-        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-            <div style="font-size:42px; font-weight:900; color:#f1f5f9;">⭐ {xp} XP</div>
-            <div style="background:rgba(139,92,246,0.15); padding:8px 16px; border-radius:99px;
-                        color:{tier_color}; font-weight:700; border:1px solid {tier_color}33;">
-                {tier_emoji} {tier_name}
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    hero_html = f'<div style="background:linear-gradient(135deg, rgba(139,92,246,0.1), rgba(6,182,212,0.05)); border:1px solid rgba(139,92,246,0.2); border-radius:16px; padding:24px; margin:16px 0;"><div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;"><div style="font-size:42px; font-weight:900; color:#f1f5f9;">⭐ {xp} XP</div><div style="background:rgba(139,92,246,0.15); padding:8px 16px; border-radius:99px; color:{tier_color}; font-weight:700; border:1px solid {tier_color}33;">{tier_emoji} {tier_name}</div></div></div>'
+    st.markdown(hero_html, unsafe_allow_html=True)
 
     # --- Progresso por Módulo ---
     st.markdown("#### 📂 Progresso por Módulo")
@@ -309,22 +295,8 @@ def _render_student_analytics():
 
             # Barra de progresso
             bar_color = "linear-gradient(90deg, #22c55e, #10b981)" if pct >= 100 else "linear-gradient(90deg, #8b5cf6, #06b6d4)"
-            st.markdown(f"""
-            <div style="background:rgba(15,10,40,0.4); border:1px solid rgba(139,92,246,0.15);
-                        border-radius:12px; padding:16px; margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-weight:700; font-size:15px; color:#e2e8f0;">{emoji} {titulo}</span>
-                    <span style="color:#06b6d4; font-weight:700; font-size:14px;">{pct}% — {status}</span>
-                </div>
-                <div style="background:rgba(255,255,255,0.06); border-radius:6px; height:8px; overflow:hidden;">
-                    <div style="height:100%; width:{pct}%; background:{bar_color}; border-radius:6px;
-                                transition:width 0.5s ease;"></div>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:12px; color:#94a3b8;">
-                    <span>Lição {indice}/{total_licoes}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            mod_html = f'<div style="background:rgba(15,10,40,0.4); border:1px solid rgba(139,92,246,0.15); border-radius:12px; padding:16px; margin-bottom:10px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span style="font-weight:700; font-size:15px; color:#e2e8f0;">{emoji} {titulo}</span><span style="color:#06b6d4; font-weight:700; font-size:14px;">{pct}% — {status}</span></div><div style="background:rgba(255,255,255,0.06); border-radius:6px; height:8px; overflow:hidden;"><div style="height:100%; width:{pct}%; background:{bar_color}; border-radius:6px; transition:width 0.5s ease;"></div></div><div style="display:flex; justify-content:space-between; margin-top:6px; font-size:12px; color:#94a3b8;"><span>Lição {indice}/{total_licoes}</span></div></div>'
+            st.markdown(mod_html, unsafe_allow_html=True)
 
             # Scores de lições deste módulo (se houver)
             mod_scores = lesson_scores.get(arquivo, {})

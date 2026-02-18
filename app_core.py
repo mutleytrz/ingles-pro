@@ -1347,25 +1347,16 @@ if _db_user:
     st.session_state['usuario'] = _db_user
 
 # -- NAV BAR --
+# -- NAV BAR --
 _tier_name, _tier_color, _tier_emoji = _get_xp_tier(int(st.session_state['xp']))
-
-# Monta link da logo preservando session token
 _st = st.query_params.get("session", "")
 _logo_href = f"?nav=inicio&session={_st}" if _st else "?nav=inicio"
 
-st.markdown(f"""
-<div class="top-nav">
-    <a href="{_logo_href}" target="_parent" style="text-decoration:none;">
-        <div class="app-logo">🚀 ENGLISH<span>PRO</span></div>
-    </a>
-    <div class="user-pill">
-        <span>👤 {st.session_state.get('name', username)}</span>
-        {"<span class='premium-badge-nav' style='background:linear-gradient(90deg,#f59e0b,#fbbf24); color:#000; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:bold; margin-left:5px; border:1px solid #d97706;box-shadow:0 0 10px rgba(245,158,11,0.3);'>👑 PREMIUM</span>" if st.session_state.get('usuario', {}).get('is_premium') else ""}
-        <span class="xp-tier-badge" style="background:rgba(139,92,246,0.1);color:{_tier_color};border:1px solid {_tier_color}33;">{_tier_emoji} {_tier_name}</span>
-        <span class="xp-badge">⭐ {st.session_state['xp']} XP</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+_is_prem = st.session_state.get('usuario', {}).get('is_premium')
+_prem_badge = f'<span class="premium-badge-nav" style="background:linear-gradient(90deg,#f59e0b,#fbbf24); color:#000; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:bold; margin-left:5px; border:1px solid #d97706;box-shadow:0 0 10px rgba(245,158,11,0.3);">👑 PREMIUM</span>' if _is_prem else ''
+
+nav_html = f'<div class="top-nav"><a href="{_logo_href}" target="_parent" style="text-decoration:none;"><div class="app-logo">🚀 ENGLISH<span>PRO</span></div></a><div class="user-pill"><span>👤 {st.session_state.get('name', username)}</span>{_prem_badge}<span class="xp-tier-badge" style="background:rgba(139,92,246,0.1);color:{_tier_color};border:1px solid {_tier_color}33;">{_tier_emoji} {_tier_name}</span><span class="xp-badge">⭐ {st.session_state['xp']} XP</span></div></div>'
+st.markdown(nav_html, unsafe_allow_html=True)
 
 # -- GOD MODE CHECK --
 god_mode = st.session_state.get('god_mode', False)
