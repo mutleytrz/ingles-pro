@@ -377,6 +377,9 @@ def update_user_xp(username: str, xp: int) -> None:
     conn.close()
 
 
+import streamlit as st
+
+@st.cache_data(ttl=60, show_spinner=False)
 def get_all_users_detailed() -> list[dict]:
     """Retorna lista completa de usuarios com XP e status Admin."""
     conn = _get_conn()
@@ -401,6 +404,7 @@ def get_all_users_detailed() -> list[dict]:
             pass
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_all_users() -> dict:
     """
     Retorna dicionario no formato que streamlit-authenticator espera:
