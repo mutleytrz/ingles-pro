@@ -22,7 +22,13 @@ def render_admin_panel(username: str, test_oral_callback=None):
         </div>
         """, unsafe_allow_html=True)
 
-    tab1, tab2, tab3 = st.tabs(["👥 Gerenciar Usuários", "📊 Evolução dos Alunos", "⚡ Ferramentas de Teste"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "👥 Gerenciar Usuários", 
+        "📊 Evolução dos Alunos", 
+        "⚡ Ferramentas de Teste", 
+        "💰 Relatório de Vendas",
+        "⚙️ Gerenciar Planos"
+    ])
 
     with tab1:
         _render_user_management(username)
@@ -32,6 +38,12 @@ def render_admin_panel(username: str, test_oral_callback=None):
 
     with tab3:
         _render_tester_tools(test_oral_callback)
+    
+    with tab4:
+        _render_sales_reports()
+        
+    with tab5:
+        _render_plan_settings()
 
 
 def _render_user_management(current_admin_user: str):
@@ -48,17 +60,18 @@ def _render_user_management(current_admin_user: str):
         return
 
     # Table Header
-    c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 2, 2, 1, 2])
+    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 2, 2, 2, 1, 2, 2])
     c1.markdown("**ID**")
     c2.markdown("**User**")
     c3.markdown("**Nome**")
     c4.markdown("**Email**")
     c5.markdown("**XP**")
-    c6.markdown("**Ações**")
+    c6.markdown("**Plano**")
+    c7.markdown("**Ações**")
     st.divider()
 
     for u in users:
-        c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 2, 2, 1, 2])
+        c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 2, 2, 2, 1, 2, 2])
         is_self = (u['username'] == current_admin_user)
         
         c1.write(f"#{u['id']}")
@@ -68,52 +81,50 @@ def _render_user_management(current_admin_user: str):
         
         # XP Edit
         with c5:
-             # Unique key per user
              current_xp = u['xp'] if u['xp'] is not None else 0
              new_xp = st.number_input("XP", value=current_xp, key=f"xp_{u['username']}", label_visibility="collapsed")
              if new_xp != current_xp:
                  if st.button("💾", key=f"save_xp_{u['username']}"):
                      database.update_user_xp(u['username'], int(new_xp))
-                     # FIX: Se estiver editando a si mesmo, atualiza a sessao imediatamente
                      if is_self:
                         st.session_state['xp'] = int(new_xp)
-                     
                      database.get_all_users_detailed.clear()
-                     st.toast(f"XP de {u['username']} atualizado!")
                      st.rerun()
 
-        # Actions
+        # Plan Info
         with c6:
+            p_type = u.get('plan_type', 'free').upper()
+            until = u.get('premium_until')
+            color = "#22c55e" if u['is_premium'] else "#94a3b8"
+            st.markdown(f"<span style='color:{color}; font-weight:bold;'>{p_type}</span>", unsafe_allow_html=True)
+            if until:
+                st.caption(f"Expira: {until[:10]}")
+
+        # Actions
+        with c7:
             _uname = u['username']
 
             # is_admin toggle
             is_adm = bool(u.get('is_admin', 0))
-            new_adm = st.checkbox("Admin", value=is_adm, key=f"is_adm_{_uname}", disabled=is_self)
+            new_adm = st.checkbox("Adm", value=is_adm, key=f"is_adm_{_uname}", disabled=is_self)
             if new_adm != is_adm:
                 database.update_user_role(_uname, new_adm)
                 database.get_all_users_detailed.clear()
-                st.toast(f"Admin de {_uname}: {'ATIVADO' if new_adm else 'REMOVIDO'}")
                 st.rerun()
 
             # is_premium toggle
             is_prem = bool(u.get('is_premium', 0))
-            new_prem = st.checkbox("Premium", value=is_prem, key=f"is_prem_{_uname}")
+            new_prem = st.checkbox("Prem", value=is_prem, key=f"is_prem_{_uname}")
             if new_prem != is_prem:
-                database.update_user_premium(_uname, new_prem)
-                st.toast(f"Premium de {_uname}: {'ATIVADO ✅' if new_prem else 'REMOVIDO ❌'}")
-                # Update session state if modifying self
-                if is_self and 'usuario' in st.session_state:
-                    st.session_state['usuario']['is_premium'] = new_prem
+                database.update_user_premium(_uname, new_prem, plan_type="manual" if new_prem else "free")
                 st.rerun()
 
-            # Password Reset
-            if st.button("🔑", key=f"pwd_{_uname}", help="Resetar Senha"):
+            # reset/delete
+            col_a, col_b = st.columns(2)
+            if col_a.button("🔑", key=f"pwd_{_uname}"):
                 _reset_password_dialog(_uname)
-            
-            # Delete User
-            if not is_self:
-                if st.button("🗑️", key=f"del_{_uname}", help="Excluir Usuário"):
-                    _delete_user_dialog(_uname)
+            if not is_self and col_b.button("🗑️", key=f"del_{_uname}"):
+                _delete_user_dialog(_uname)
 
     st.divider()
 
@@ -378,4 +389,94 @@ def _render_tester_tools(test_oral_callback=None):
             st.session_state['tentativa'] = 0
             # Salva auto
             database.save_module_progress(st.session_state.get('username'), sel_mod, idx)
+            st.rerun()
+
+def _render_sales_reports():
+    st.markdown("### 💰 Relatório de Vendas Mercado Pago")
+    
+    if st.button("🔄 Atualizar Vendas", key="refresh_sales"):
+        st.rerun()
+    
+    payments = database.get_all_payments()
+    if not payments:
+        st.info("Nenhum pagamento registrado ainda.")
+        return
+
+    # Sumário rápido
+    total_sales = len(payments)
+    total_revenue = sum(p['amount'] for p in payments if p['status'] == 'approved' or p['status'] == 'success')
+    
+    c1, c2 = st.columns(2)
+    c1.metric("Total de Transações", total_sales)
+    c2.metric("Receita Total (Aproximada)", f"R$ {total_revenue:.2f}")
+
+    st.divider()
+    
+    # Table Header
+    cols = st.columns([2, 2, 2, 1, 1, 2])
+    cols[0].markdown("**Data**")
+    cols[1].markdown("**Usuário**")
+    cols[2].markdown("**ID Mercado Pago**")
+    cols[3].markdown("**Valor**")
+    cols[4].markdown("**Status**")
+    cols[5].markdown("**Referência**")
+    st.divider()
+
+    for p in payments:
+        cols = st.columns([2, 2, 2, 1, 1, 2])
+        # Formatar data simplificada
+        dt_str = p['created_at'].split('.')[0] if '.' in p['created_at'] else p['created_at']
+        
+        cols[0].write(dt_str)
+        cols[1].write(f"{p['user_fullname']} (@{p['username']})")
+        cols[2].code(p['payment_id'])
+        cols[3].write(f"R$ {p['amount']:.2f}")
+        
+        status = p['status']
+        if status in ['approved', 'success']:
+            cols[4].success("Aprovado")
+        elif status == 'pending':
+            cols[4].warning("Pendente")
+        else:
+            cols[4].error(status)
+            
+        cols[5].write(p['external_reference'] or "-")
+
+def _render_plan_settings():
+    st.markdown("### ⚙️ Configuração de Planos e Preços")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 💰 Preços dos Planos")
+        
+        p_mensal = st.text_input("Plano Mensal (Ex: 14.99)", value=database.get_setting("price_mensal", "14.99"))
+        p_anual = st.text_input("Plano Anual (Ex: 159.00)", value=database.get_setting("price_anual", "159.00"))
+        p_vitalicio = st.text_input("Plano Vitalício (Ex: 499.00)", value=database.get_setting("price_vitalicio", "499.00"))
+        
+        if st.button("💾 Salvar Preços", type="primary"):
+            database.update_setting("price_mensal", p_mensal)
+            database.update_setting("price_anual", p_anual)
+            database.update_setting("price_vitalicio", p_vitalicio)
+            st.success("Preços atualizados!")
+            st.rerun()
+
+    with col2:
+        st.markdown("#### 👁️ Visibilidade e Links")
+        
+        show_v = database.get_setting("show_vitalicio", "0") == "1"
+        new_show_v = st.toggle("Exibir Plano Vitalício na Assinatura", value=show_v)
+        if new_show_v != show_v:
+            database.update_setting("show_vitalicio", "1" if new_show_v else "0")
+            st.rerun()
+            
+        st.divider()
+        st.markdown("#### 📥 Links de Download (Vitalício)")
+        dl_pc = st.text_input("Link Windows (.exe)", value=database.get_setting("download_pc_url", ""))
+        dl_mob = st.text_input("Link Android (.apk)", value=database.get_setting("download_mobile_url", ""))
+        
+        if st.button("💾 Salvar Links"):
+            database.update_setting("download_pc_url", dl_pc)
+            database.update_setting("download_mobile_url", dl_mob)
+            st.success("Links salvos!")
             st.rerun()

@@ -10,5 +10,8 @@
     "SMTP_PORT": 587,
     "SMTP_USER": "",
     "SMTP_PASS": "",
-    "SMTP_FROM_NAME": "English Pro AI"
+    "SMTP_FROM_NAME": "English Pro AI",
+    "MP_ACCESS_TOKEN": "YOUR_MP_ACCESS_TOKEN",
+    "MP_PUBLIC_KEY": "YOUR_MP_PUBLIC_KEY",
+    "BASE_URL": "https://ingles-pro-ud9k8jhbwxggsbwvgbh9k2.streamlit.app/"
 }

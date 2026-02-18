@@ -1,7 +1,6 @@
-from __future__ import annotations
-# database.py — Camada de banco de dados (SQLite local + Turso remoto)
-
 import sqlite3
+import requests
+import json
 from datetime import datetime, timezone
 from config import DB_PATH
 from typing import Optional, Any
@@ -27,10 +26,94 @@ class DictRow(dict):
 
 
 # ---------------------------------------------------------------------------
-# TursoCursor — faz o resultado do libsql-client parecer um cursor sqlite3
+# Custom Turso Client (Bypass libsql-client compatibility issues)
+# ---------------------------------------------------------------------------
+class CustomResultSet:
+    def __init__(self, result_dict):
+        self.columns = [c["name"] for c in result_dict.get("cols", [])]
+        raw_rows = result_dict.get("rows", [])
+        self.rows = []
+        for r in raw_rows:
+            parsed_row = []
+            for cell in r:
+                if isinstance(cell, dict) and "type" in cell:
+                    t = cell["type"]
+                    v = cell.get("value")
+                    if t == "integer":
+                        parsed_row.append(int(v) if v is not None else None)
+                    elif t == "float":
+                        parsed_row.append(float(v) if v is not None else None)
+                    elif t == "null":
+                        parsed_row.append(None)
+                    else:
+                        parsed_row.append(v)
+                else:
+                    parsed_row.append(cell)
+            self.rows.append(tuple(parsed_row))
+
+class TursoClientCustom:
+    def __init__(self, url: str, auth_token: str):
+        self.url = url.replace("libsql://", "https://")
+        if "/v1/execute" not in self.url:
+            self.url = self.url.rstrip("/") + "/v1/execute"
+        self.auth_token = auth_token
+        self.headers = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
+        # Use a Session for connection pooling (HTTP Keep-Alive)
+        self.session = requests.Session()
+
+    def execute(self, sql: str, params: list | tuple | None = None) -> CustomResultSet:
+        stmt = {"sql": sql}
+        if params:
+            stmt["args"] = [self._encode_value(v) for v in params]
+        
+        payload = {"stmt": stmt}
+        # Connection management via Session.post
+        resp = self.session.post(self.url, json=payload, headers=self.headers, timeout=15)
+        
+        if resp.status_code != 200:
+            msg = f"Turso HTTP {resp.status_code}: {resp.text}"
+            print(f"[TURSO ERR] {msg}")
+            try:
+                err_data = resp.json()
+                if "error" in err_data:
+                    raise Exception(f"Turso Error: {err_data['error']}")
+            except Exception as e:
+                if not isinstance(e, requests.exceptions.JSONDecodeError): raise
+            resp.raise_for_status()
+        data = resp.json()
+        
+        if "result" not in data:
+            if "error" in data:
+                raise Exception(f"Turso Error: {data['error']}")
+            if "message" in data:
+                raise Exception(f"Turso Error: {data['message']} (Code: {data.get('code', 'UNKNOWN')})")
+            if "results" in data and isinstance(data["results"], list) and len(data["results"]) > 0:
+                res = data["results"][0]
+                if "result" in res: return CustomResultSet(res["result"])
+                return CustomResultSet(res)
+            raise KeyError(f"Unexpected Turso response format: {data}")
+            
+        return CustomResultSet(data["result"])
+
+    def _encode_value(self, v):
+        if isinstance(v, bool):
+            return {"type": "integer", "value": "1" if v else "0"}
+        if isinstance(v, int):
+            return {"type": "integer", "value": str(v)}
+        if isinstance(v, float):
+            return {"type": "float", "value": v}
+        if v is None:
+            return {"type": "null"}
+        return {"type": "text", "value": str(v)}
+
+    def close(self):
+        pass
+
+# ---------------------------------------------------------------------------
+# TursoCursor — faz o resultado do client parecer um cursor sqlite3
 # ---------------------------------------------------------------------------
 class TursoCursor:
-    """Emula cursor sqlite3 a partir de um ResultSet do libsql-client."""
+    """Emula cursor sqlite3 a partir de um ResultSet."""
     def __init__(self, result_set):
         self._rs = result_set
         self._rows = []
@@ -38,7 +121,6 @@ class TursoCursor:
             cols = list(result_set.columns) if hasattr(result_set, 'columns') else []
             self._rows = [DictRow(cols, r) for r in result_set.rows]
         self._index = 0
-        # Expor description pra compatibilidade
         self.description = None
 
     def fetchone(self):
@@ -58,20 +140,17 @@ class TursoCursor:
 
 
 # ---------------------------------------------------------------------------
-# TursoConnection — wrapper que faz libsql-client parecer sqlite3.Connection
+# TursoConnection — wrapper que faz o client parecer sqlite3.Connection
 # ---------------------------------------------------------------------------
 class TursoConnection:
-    """Adapta o ClientSync do libsql-client pra interface sqlite3."""
+    """Adapta o client custom pra interface sqlite3."""
     def __init__(self, client):
         self._client = client
         self._closed = False
 
     def execute(self, sql: str, params=None) -> TursoCursor:
         """Executa SQL e retorna TursoCursor."""
-        if params:
-            rs = self._client.execute(sql, list(params))
-        else:
-            rs = self._client.execute(sql)
+        rs = self._client.execute(sql, params)
         return TursoCursor(rs)
 
     def executescript(self, script: str):
@@ -81,35 +160,27 @@ class TursoConnection:
             self._client.execute(stmt)
 
     def commit(self):
-        """No-op — libsql-client auto-commits."""
         pass
 
     def close(self):
-        """No-op para o singleton — conexao eh reusada.
-        Use close_for_real() para fechar de verdade."""
         pass
 
     def close_for_real(self):
-        """Fecha o client de verdade (usado apenas no shutdown)."""
         if not self._closed:
-            try:
-                self._client.close()
-            except Exception:
-                pass
             self._closed = True
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-        pass  # Nao fecha — singleton
+        pass
 
 
 # ---------------------------------------------------------------------------
 # Flag global: True se estamos usando Turso
 # ---------------------------------------------------------------------------
 _using_turso = False
-_turso_singleton: TursoConnection | None = None  # Singleton para reuso
+_turso_singleton: TursoConnection | None = None 
 
 
 def _get_conn():
@@ -117,25 +188,17 @@ def _get_conn():
     global _using_turso, _turso_singleton
     import config
 
-    # Se tiver credenciais do Turso, conecta via libsql-client (HTTP)
+    # Se tiver credenciais do Turso, conecta via client custom (HTTP)
     if config.TURSO_DB_URL and config.TURSO_AUTH_TOKEN:
-        # Reusa conexão existente se ainda estiver aberta
         if _turso_singleton is not None and not _turso_singleton._closed:
             return _turso_singleton
         try:
-            from libsql_client import create_client_sync
-            url = config.TURSO_DB_URL
-            # Normalizar URL: libsql-client precisa de https:// ao inves de libsql://
-            if url.startswith("libsql://"):
-                url = url.replace("libsql://", "https://", 1)
-            client = create_client_sync(url, auth_token=config.TURSO_AUTH_TOKEN)
+            client = TursoClientCustom(config.TURSO_DB_URL, config.TURSO_AUTH_TOKEN)
             _using_turso = True
             _turso_singleton = TursoConnection(client)
             return _turso_singleton
-        except ImportError:
-            print("AVISO: libsql-client nao instalado. Usando SQLite local.")
         except Exception as e:
-            print(f"ERRO DE CONEXAO TURSO: {e}. Usando SQLite local.")
+            print(f"ERRO DE CONEXAO TURSO CUSTOM: {e}. Usando SQLite local.")
 
     # Fallback SQLite Local
     _using_turso = False
@@ -157,7 +220,14 @@ def init_db() -> None:
             email       TEXT    UNIQUE,
             is_admin    BOOLEAN DEFAULT 0,
             is_premium  BOOLEAN DEFAULT 0,
+            plan_type   TEXT    DEFAULT 'free',
+            premium_until TEXT,
             created_at  TEXT    DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key         TEXT PRIMARY KEY,
+            value       TEXT
         );
 
         CREATE TABLE IF NOT EXISTS progress (
@@ -180,6 +250,18 @@ def init_db() -> None:
             indice        INTEGER DEFAULT 0,
             updated_at    TEXT    DEFAULT (datetime('now')),
             UNIQUE(username, module_file),
+            FOREIGN KEY (username) REFERENCES users(username)
+        );
+
+        CREATE TABLE IF NOT EXISTS payments (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            username    TEXT,
+            payment_id  TEXT,
+            status      TEXT,
+            amount      REAL,
+            currency    TEXT,
+            external_reference TEXT,
+            created_at  TEXT    DEFAULT (datetime('now')),
             FOREIGN KEY (username) REFERENCES users(username)
         );
     """)
@@ -209,6 +291,22 @@ def _check_migrations():
             print("[MIGRATION] Adicionando coluna is_premium na tabela users...")
             conn.execute("ALTER TABLE users ADD COLUMN is_premium BOOLEAN DEFAULT 0")
 
+        if "plan_type" not in columns:
+            print("[MIGRATION] Adicionando colunas de plano na tabela users...")
+            conn.execute("ALTER TABLE users ADD COLUMN plan_type TEXT DEFAULT 'free'")
+            conn.execute("ALTER TABLE users ADD COLUMN premium_until TEXT")
+
+        # Settings table migration
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        
+        # Initialize default settings if not present
+        _init_default_settings(conn)
+
         # Lesson scores table (best score per lesson for badges)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS lesson_scores (
@@ -236,10 +334,58 @@ def _check_migrations():
                 FOREIGN KEY (username) REFERENCES users(username)
             )
         """)
+
+        # Payments table migration
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                username    TEXT,
+                payment_id  TEXT,
+                status      TEXT,
+                amount      REAL,
+                currency    TEXT,
+                external_reference TEXT,
+                created_at  TEXT    DEFAULT (datetime('now')),
+                FOREIGN KEY (username) REFERENCES users(username)
+            )
+        """)
         # Um unico commit para todas as migracoes
         conn.commit()
     except Exception as e:
         print(f"[ERR] Falha na migracao: {e}")
+
+def _init_default_settings(conn):
+    """Inicializa precos e visibilidade padrao."""
+    defaults = {
+        "price_mensal": "14.99",
+        "price_anual": "159.00",
+        "price_vitalicio": "499.00",
+        "show_vitalicio": "0",  # Oculto por padrao conforme pedido
+        "download_pc_url": "",
+        "download_mobile_url": ""
+    }
+    for k, v in defaults.items():
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+
+def get_setting(key: str, default: str = "") -> str:
+    conn = _get_conn()
+    try:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else default
+    except Exception:
+        return default
+    finally:
+        conn.close()
+
+def update_setting(key: str, value: str):
+    conn = _get_conn()
+    try:
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
+        conn.commit()
+    except Exception as e:
+        print(f"[ERR] update_setting: {e}")
+    finally:
+        conn.close()
 
 
 # -- Usuarios --
@@ -253,6 +399,9 @@ def create_user(username: str, name: str, password_hash: str) -> bool:
             (username, name, password_hash),
         )
         conn.commit()
+        # Invalida caches para o autenticador ver o novo usuário
+        get_all_users.clear()
+        get_user.clear()
         return True
     except (sqlite3.IntegrityError, Exception) as e:
         # Turso pode lancar excecao diferente de sqlite3.IntegrityError
@@ -271,6 +420,9 @@ def create_user_with_email(username: str, name: str, password_hash: str, email: 
             (username, name, password_hash, email, code),
         )
         conn.commit()
+        # Invalida caches para o autenticador ver o novo usuário
+        get_all_users.clear()
+        get_user.clear()
         return True
     except (sqlite3.IntegrityError, Exception) as e:
         err_msg = str(e).lower()
@@ -293,6 +445,9 @@ def verify_email_code(username: str, code: str) -> bool:
     if saved_code == code:
         conn.execute("UPDATE users SET email_verified = 1 WHERE username = ?", (username,))
         conn.commit()
+        # Invalida caches para o autenticador ver que o email foi verificado
+        get_all_users.clear()
+        get_user.clear()
         return True
     return False
 
@@ -311,11 +466,12 @@ def is_email_verified(username: str) -> bool:
     return bool(row["email_verified"])
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_user(username: str) -> Optional[dict]:
-    """Retorna dict do usuario ou None."""
+    """Retorna dict do usuario ou None. Cacheado por 60s."""
     conn = _get_conn()
     row = conn.execute(
-        "SELECT username, name, password_hash, is_premium FROM users WHERE username = ?",
+        "SELECT username, name, password_hash, is_premium, plan_type, premium_until FROM users WHERE username = ?",
         (username,),
     ).fetchone()
     if row:
@@ -359,16 +515,61 @@ def update_user_password(username: str, new_hash: str) -> None:
     conn.commit()
 
 
-def update_user_premium(username: str, is_premium: bool) -> None:
-    """Atualiza status Premium do usuario."""
+def update_user_premium(username: str, is_premium: bool, plan_type: str = "free") -> None:
+    """Atualiza status Premium do usuario com tipo de plano e data de expiração."""
+    from datetime import timedelta
     conn = _get_conn()
+    
+    until = None
+    if is_premium:
+        now = datetime.now(timezone.utc)
+        if plan_type == "mensal":
+            until = (now + timedelta(days=31)).isoformat()
+        elif plan_type == "anual":
+            until = (now + timedelta(days=366)).isoformat()
+        elif plan_type == "vitalicio":
+            until = None # Sem expiração
+    
     conn.execute(
-        "UPDATE users SET is_premium = ? WHERE username = ?",
-        (1 if is_premium else 0, username),
+        "UPDATE users SET is_premium = ?, plan_type = ?, premium_until = ? WHERE username = ?",
+        (1 if is_premium else 0, plan_type, until, username),
     )
     conn.commit()
     # Limpa cache para refletir a mudanca imediatamente
     get_all_users_detailed.clear()
+    get_user.clear()
+
+def log_payment(username: str, payment_id: str, status: str, amount: float, currency: str = "BRL", external_ref: str = ""):
+    """Registra um log de pagamento na tabela payments."""
+    conn = _get_conn()
+    try:
+        conn.execute("""
+            INSERT INTO payments (username, payment_id, status, amount, currency, external_reference)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (username, payment_id, status, amount, currency, external_ref))
+        conn.commit()
+    except Exception as e:
+        print(f"[ERR] log_payment: {e}")
+    finally:
+        conn.close()
+
+def get_all_payments() -> list[dict[str, Any]]:
+    """Retorna todos os registros de pagamentos para o painel ADM."""
+    conn = _get_conn()
+    try:
+        cursor = conn.execute("""
+            SELECT p.*, u.name as user_fullname 
+            FROM payments p
+            LEFT JOIN users u ON p.username = u.username
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[ERR] get_all_payments: {e}")
+        return []
+    finally:
+        conn.close()
 
 
 def update_user_xp(username: str, xp: int) -> None:
@@ -396,7 +597,7 @@ def get_all_users_detailed() -> list[dict]:
     # Join users and progress
     try:
         query = """
-            SELECT u.id, u.username, u.name, u.email, u.is_admin, u.is_premium, p.xp 
+            SELECT u.id, u.username, u.name, u.email, u.is_admin, u.is_premium, u.plan_type, u.premium_until, p.xp 
             FROM users u
             LEFT JOIN progress p ON u.username = p.username
             ORDER BY u.id ASC

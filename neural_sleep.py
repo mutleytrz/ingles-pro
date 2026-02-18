@@ -542,6 +542,9 @@ def render_neural_mode(username: str):
         st.markdown("<br>", unsafe_allow_html=True)
         
         if st.button("🔮 GERAR SESSÃO DE HIPNOSE (TTS)", type="primary", use_container_width=True):
+            st.session_state['trigger_generation'] = True
+
+        if st.session_state.get('trigger_generation'):
             with st.spinner("Sintetizando vozes neurais... (Aguarde ~10s)"):
                 # Carrega CSV
                 full_path = os.path.join(config.CSV_DIR, arquivo_csv)
@@ -577,21 +580,13 @@ def render_neural_mode(username: str):
                                     <br><strong style="color: #a78bfa;">Assine o Premium</strong> para desbloquear sessões profundas de 30 frases.
                                 </p>
                             </div>
-                            <a href="#" style="
-                                background: linear-gradient(90deg, #8b5cf6, #d946ef);
-                                color: white;
-                                text-decoration: none;
-                                padding: 10px 20px;
-                                border-radius: 8px;
-                                font-weight: 700;
-                                font-size: 14px;
-                                white-space: nowrap;
-                                box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
-                                text-transform: uppercase;
-                                letter-spacing: 0.5px;
-                            ">Virar Premium</a>
                         </div>
                         """, unsafe_allow_html=True)
+                        if st.button("🚀 VIRAR PREMIUM", type="primary", use_container_width=True, key="btn_premium_sleep"):
+                            st.session_state['pagina'] = 'assinatura'
+                            # Clear the flag to prevent re-entering this block if they come back
+                            st.session_state['trigger_generation'] = False
+                            st.rerun()
                     else:
                         # Pega apenas 30 frases para nao travar o servidor (Premium)
                         df_slice = df.head(30)

@@ -70,6 +70,11 @@ DB_PATH: str = os.path.normpath(_db_raw if os.path.isabs(_db_raw) else os.path.j
 TURSO_DB_URL: str = _get("TURSO_DB_URL", "")
 TURSO_AUTH_TOKEN: str = _get("TURSO_AUTH_TOKEN", "")
 
+# -- Mercado Pago --
+MP_ACCESS_TOKEN: str = _get("MP_ACCESS_TOKEN", "")
+MP_PUBLIC_KEY: str = _get("MP_PUBLIC_KEY", "")
+BASE_URL: str = _get("BASE_URL", "http://localhost:8501")
+
 # -- Seguranca --
 SECRET_KEY: str = _get("SECRET_KEY", "CHANGE_ME_IN_PRODUCTION")
 if SECRET_KEY == "CHANGE_ME_IN_PRODUCTION":

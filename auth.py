@@ -107,6 +107,9 @@ def render_email_verification(username: str):
             st.success("✅ Email verificado com sucesso! Você já pode entrar.")
             if "pending_verification_user" in st.session_state:
                 del st.session_state["pending_verification_user"]
+            # NUCLEAR OPTION: Clear authenticator cache to force reload of users from DB
+            if "_authenticator_instance" in st.session_state:
+                del st.session_state["_authenticator_instance"]
             st.balloons()
             st.rerun()
         else:

@@ -438,37 +438,16 @@ def render_pronunciation_coach(username: str):
         Você completou a frase gratuita deste módulo! <br>
         O treino completo contém dezenas de frases com feedback detalhado.
     </p>
-    
-    <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-        <a href="#" style="
-            background: linear-gradient(90deg, #22d3ee, #06b6d4);
-            color: white;
-            padding: 14px 28px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 16px;
-            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4);
-        ">⚡ VIRAR PREMIUM</a>
-        
-        <button style="
-             background: rgba(255,255,255,0.05);
-             color: #94a3b8;
-             padding: 14px 28px;
-             border-radius: 12px;
-             border: 1px solid rgba(255,255,255,0.1);
-             font-weight: 600;
-             font-size: 14px;
-             cursor: pointer;
-        " onclick="window.location.reload()">Agora não</button>
-    </div>
 </div>
-""", height=500)
+""", height=400)
         
-        if st.button("⬅ Voltar aos Módulos", key="lock_back_btn"):
-             st.session_state["coach_module"] = None
+        if st.button("🚀 SEJA PREMIUM AGORA", key="coach_btn_premium", type="primary", use_container_width=True):
+             st.session_state['pagina'] = 'assinatura'
              st.rerun()
              
+        if st.button("⬅ Voltar aos Módulos", key="lock_back_btn", use_container_width=True):
+             st.session_state["coach_module"] = None
+             st.rerun()
         st.stop()
 
     if idx >= total:

@@ -26,6 +26,7 @@ import icons
 import admin_panel
 import neural_sleep
 import pronunciation_coach
+import payments
 
 # -- Inicializa banco de dados (Apenas uma vez) --
 @st.cache_resource
@@ -1242,6 +1243,53 @@ username = auth.render_login()
 if username is None:
     st.stop()
 
+# -- CHECK FOR PAYMENT STATUS (Mercado Pago Return) --
+query_params = st.query_params
+if "payment_status" in query_params:
+    status = query_params["payment_status"]
+    payment_id = query_params.get("payment_id")
+    
+    if status == "success" and payment_id:
+        with st.spinner("Verificando seu pagamento..."):
+            p_data = payments.verify_payment(payment_id)
+            if p_data and p_data.get("status") == "approved":
+                ext_ref = p_data.get("external_reference", "")
+                # ext_ref format: "username|plan_type"
+                if "|" in ext_ref:
+                    user_ref, plan_ref = ext_ref.split("|", 1)
+                else:
+                    user_ref, plan_ref = username, "vitalicio" # fallback
+                
+                # Preco pago
+                amount_paid = float(p_data.get("transaction_amount", 97.90))
+                
+                database.update_user_premium(user_ref, True, plan_type=plan_ref)
+                database.log_payment(user_ref, payment_id, "success", amount_paid, "BRL", plan_ref)
+                
+                st.success(f"🎉 PARABÉNS! Seu Plano {plan_ref.upper()} foi ativado com sucesso!")
+                st.query_params.clear()
+                if "_st" in locals() and _st:
+                     st.query_params["session"] = _st
+                
+                if 'usuario' in st.session_state:
+                    st.session_state['usuario']['is_premium'] = True
+                    st.session_state['usuario']['plan_type'] = plan_ref
+                
+                time.sleep(2)
+                st.rerun()
+            else:
+                st.error("⚠️ Não conseguimos confirmar seu pagamento como aprovado.")
+    elif status == "failure":
+        if payment_id:
+            database.log_payment(username, payment_id, "failure", 0.0)
+        st.error("❌ O pagamento foi recusado ou cancelado.")
+        st.query_params.clear()
+    elif status == "pending":
+        if payment_id:
+            database.log_payment(username, payment_id, "pending", 0.0)
+        st.warning("⏳ Pagamento pendente. Seu Premium será ativado em breve.")
+        st.query_params.clear()
+
 # -----------------------------------------------------------
 # CARREGAR DADOS DO USUÁRIO (CRÍTICO: ANTES DA RENDERIZAÇÃO)
 # -----------------------------------------------------------
@@ -1284,9 +1332,18 @@ is_admin = database.is_user_admin(username)
 
 # -- CARREGAR DADOS DO USUARIO (PREMIUM, ADMIN, etc.) --
 # Recarrega SEMPRE do banco para refletir mudanças feitas pelo admin em tempo real
-# (ex: marcar/desmarcar premium). É um SELECT leve, sem impacto de performance.
 _db_user = database.get_user(username)
 if _db_user:
+    # Verificação de Expiração de Plano
+    if _db_user.get('is_premium') and _db_user.get('premium_until'):
+        from datetime import datetime, timezone
+        until = datetime.fromisoformat(_db_user['premium_until'])
+        if datetime.now(timezone.utc) > until:
+            # Plano expirou
+            database.update_user_premium(username, False, plan_type="free")
+            _db_user = database.get_user(username) # Recarrega status atualizado
+            st.warning("⚠️ Seu acesso Premium (Mensal/Anual) expirou. Renove agora para continuar!")
+    
     st.session_state['usuario'] = _db_user
 
 # -- NAV BAR --
@@ -1331,6 +1388,21 @@ with st.sidebar:
         st.session_state['pagina'] = 'neural_sleep'
         st.rerun()
 
+    # -- PREMIUM UPSELL --
+    _user_prem = st.session_state.get('usuario', {}).get('is_premium', False)
+    if not _user_prem and not god_mode:
+        st.markdown("---")
+        st.markdown("""
+        <div style="background:rgba(139,92,246,0.1); padding:15px; border-radius:12px; border:1px solid rgba(139,92,246,0.2); text-align:center;">
+            <div style="font-size:24px; margin-bottom:10px;">💎</div>
+            <div style="font-size:14px; color:#c4b5fd; font-weight:700; margin-bottom:5px;">CONTA GRATUITA</div>
+            <div style="font-size:12px; color:#94a3b8; margin-bottom:15px;">Assine para desbloquear todas as lições e áudios.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚀 SEJA PREMIUM", type="primary", use_container_width=True):
+             st.session_state['pagina'] = 'assinatura'
+             st.rerun()
+
     if st.button("🎓 Professor de Pronúncia", use_container_width=True):
         st.session_state['pagina'] = 'pronunciation_coach'
         st.rerun()
@@ -1342,6 +1414,20 @@ with st.sidebar:
              st.rerun()
         if st.button("🎤 Testar Prova Oral", use_container_width=True):
              _trigger_oral_test(username)
+    
+    # Seção de Download para usuários Vitalícios
+    if st.session_state.get('usuario', {}).get('plan_type') == 'vitalicio':
+        st.markdown("---")
+        st.markdown("### 📥 Meus Downloads")
+        dl_pc = database.get_setting("download_pc_url", "")
+        dl_apk = database.get_setting("download_mobile_url", "")
+        
+        if dl_pc:
+            st.link_button("💻 Versão Windows (.exe)", dl_pc, use_container_width=True)
+        if dl_apk:
+            st.link_button("📱 Versão Android (.apk)", dl_apk, use_container_width=True)
+        if not dl_pc and not dl_apk:
+            st.caption("Links de download estarão disponíveis em breve.")
              
     st.markdown("---")
     auth.render_logout(location="sidebar")
@@ -1422,74 +1508,84 @@ elif st.session_state['pagina'] == 'admin_panel':
 
 elif st.session_state['pagina'] == 'assinatura':
     # Subscription / Payment Page
-    import streamlit.components.v1 as components
-    components.html("""
-<div style="text-align: center; padding: 40px 20px;">
-    <h1 style="font-size: 48px; font-weight: 800; background: linear-gradient(90deg, #8b5cf6, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-        🚀 Desbloqueie Seu Potencial
-    </h1>
-    <p style="font-size: 20px; color: #a5b4c8; margin-top: 10px;">
-        Tenha acesso ilimitado a todos os módulos, recursos e ferramentas avançadas
-    </p>
-</div>
-""", height=200)
-    
-    # Pricing Cards
-    col1, col2, col3 = st.columns([1,4,1])
+    st.markdown("""
+    <div style="text-align:center; padding:20px 0;">
+        <h1 style="font-size:42px; background:linear-gradient(90deg, #8b5cf6, #06b6d4); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:800;">
+            Escolha seu Plano Premium
+        </h1>
+        <p style="color:#94a3b8; font-size:18px;">Desbloqueie o potencial máximo do seu aprendizado.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Precos do DB
+    p_mensal = float(database.get_setting("price_mensal", "14.99"))
+    p_anual = float(database.get_setting("price_anual", "159.00"))
+    p_vitalicio = float(database.get_setting("price_vitalicio", "499.00"))
+    show_vitalicio = database.get_setting("show_vitalicio", "0") == "1"
+
+    if show_vitalicio:
+        col1, col2, col3 = st.columns(3)
+    else:
+        col1, col2 = st.columns(2)
+        col3 = None
+
+    with col1:
+        st.markdown(f"""
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(139,92,246,0.2); border-radius:20px; padding:30px; text-align:center; min-height:350px;">
+            <h3 style="margin:0; font-size:22px;">Mensal</h3>
+            <div style="font-size:36px; font-weight:800; margin:15px 0;">R$ {p_mensal:.2f}<span style="font-size:16px; color:#94a3b8;">/mês</span></div>
+            <ul style="text-align:left; color:#cbd5e1; font-size:14px; margin:20px 0; list-style:none; padding:0;">
+                <li>✅ Todos os 13 módulos</li>
+                <li>✅ IA de Pronúncia</li>
+                <li>✅ Modo Zen Completo</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("ASSINAR MENSAL", key="btn_mensal", type="secondary", use_container_width=True):
+            with st.spinner("Gerando link..."):
+                url = payments.create_checkout_preference(username, st.session_state.get('usuario',{}).get('email',''), "Plano Mensal", p_mensal, "mensal")
+                if url: st.markdown(f'<meta http-equiv="refresh" content="0; url={url}">', unsafe_allow_html=True)
+
     with col2:
-        components.html("""
-<div style="
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
-    border: 2px solid rgba(139, 92, 246, 0.3);
-    border-radius: 20px;
-    padding: 40px;
-    margin: 20px 0;
-">
-    <div style="text-align: center;">
-        <div style="font-size: 18px; color: #8b5cf6; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px;">
-            ⭐ Plano Premium
+        st.markdown(f"""
+        <div style="background:rgba(139,92,246,0.1); border:2px solid #8b5cf6; border-radius:20px; padding:30px; text-align:center; position:relative; overflow:hidden; min-height:350px;">
+            <div style="position:absolute; top:12px; right:-30px; background:#8b5cf6; color:white; padding:2px 30px; transform:rotate(45deg); font-size:10px; font-weight:bold;">POPULAR</div>
+            <h3 style="margin:0; font-size:22px;">Anual</h3>
+            <div style="font-size:36px; font-weight:800; margin:15px 0;">R$ {p_anual:.2f}<span style="font-size:16px; color:#94a3b8;">/ano</span></div>
+            <ul style="text-align:left; color:#cbd5e1; font-size:14px; margin:20px 0; list-style:none; padding:0;">
+                <li>✅ Tudo do Mensal</li>
+                <li>✅ Desconto de 12%</li>
+                <li>✅ Suporte Prioritário</li>
+            </ul>
         </div>
-        <div style="font-size: 56px; font-weight: 800; color: #fff; margin: 20px 0;">
-            R$ 29<span style="font-size: 24px; color: #94a3b8;">/mês</span>
-        </div>
-        <div style="color: #64748b; margin-bottom: 30px;">Cancele quando quiser</div>
-    </div>
-    
-    <div style="margin: 30px 0; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px;">
-        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Acesso ilimitado a todos os módulos</div>
-        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Professor de Pronúncia IA completo</div>
-        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Modo Neural Sleep ilimitado</div>
-        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Provas orais adaptativas</div>
-        <div style="color: #e2e8f0; margin: 12px 0; font-size: 16px;">✅ Suporte prioritário</div>
-    </div>
-</div>
-""", height=500)
-        
-        st.markdown("### 💳 Escolha sua forma de pagamento:")
-        
-        payment_method = st.radio(
-            "Selecione:",
-            ["💰 PagSeguro", "🛒 Mercado Pago"],
-            label_visibility="collapsed"
-        )
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        if st.button("🚀 ASSINAR AGORA", type="primary", use_container_width=True, key="subscribe_btn"):
-            if "PagSeguro" in payment_method:
-                st.info("🔄 **Redirecionando para PagSeguro...**\n\n*Em breve*: Integração com API do PagSeguro será implementada aqui.")
-                # TODO: Integrar com PagSeguro API
-                # pagseguro_url = create_pagseguro_checkout(username, plan="premium")
-                # st.markdown(f'<meta http-equiv="refresh" content="0;url={pagseguro_url}">', unsafe_allow_html=True)
-            else:
-                st.info("🔄 **Redirecionando para Mercado Pago...**\n\n*Em breve*: Integração com API do Mercado Pago será implementada aqui.")
-                # TODO: Integrar com Mercado Pago API
-                # mercadopago_url = create_mercadopago_preference(username, plan="premium")
-                # st.markdown(f'<meta http-equiv="refresh" content="0;url={mercadopago_url}">', unsafe_allow_html=True)
-        
-        if st.button("⬅ Voltar", key="sub_back"):
-            st.session_state['pagina'] = 'inicio'
-            st.rerun()
+        """, unsafe_allow_html=True)
+        if st.button("ASSINAR ANUAL", key="btn_anual", type="primary", use_container_width=True):
+            with st.spinner("Gerando link..."):
+                url = payments.create_checkout_preference(username, st.session_state.get('usuario',{}).get('email',''), "Plano Anual", p_anual, "anual")
+                if url: st.markdown(f'<meta http-equiv="refresh" content="0; url={url}">', unsafe_allow_html=True)
+
+    if show_vitalicio:
+        with col3:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg, rgba(6,182,212,0.1), rgba(139,92,246,0.1)); border:1px solid #06b6d4; border-radius:20px; padding:30px; text-align:center; min-height:350px;">
+                <h3 style="margin:0; font-size:22px;">Vitalício</h3>
+                <div style="font-size:36px; font-weight:800; margin:15px 0;">R$ {p_vitalicio:.2f}</div>
+                <ul style="text-align:left; color:#cbd5e1; font-size:14px; margin:20px 0; list-style:none; padding:0;">
+                    <li>✅ Acesso para SEMPRE</li>
+                    <li>✅ Download do Sistema</li>
+                    <li>✅ Bônus Exclusivos</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("COMPRAR VITALÍCIO", key="btn_vitalicio", type="secondary", use_container_width=True):
+                with st.spinner("Gerando link..."):
+                    url = payments.create_checkout_preference(username, st.session_state.get('usuario',{}).get('email',''), "Plano Vitalício", p_vitalicio, "vitalicio")
+                    if url: st.markdown(f'<meta http-equiv="refresh" content="0; url={url}">', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("⬅ Voltar", key="sub_back"):
+        st.session_state['pagina'] = 'inicio'
+        st.rerun()
 
 elif st.session_state['pagina'] == 'inicio':
     # Calculate dynamic stats
@@ -1937,12 +2033,6 @@ elif st.session_state['pagina'] == 'aula':
             
         if img_src:
             st.markdown(f"""<div class="img-premium-wrap" style="position:relative; padding:0; line-height:0;">{badge_html}<img src="{img_src}" style="width:100%; display:block; border-radius:12px;"></div>""", unsafe_allow_html=True)
-        else:
-            # DEBUG: Se nao achou imagem, mostra warning com info
-            st.warning(f"Imagem não encontrada. ID: {atual.get('id')} | URL: {atual.get('img')}")
-            # Tenta mostrar o que tem no 'img' cru, caso seja util
-            if atual.get('img'):
-                st.write(f"Source URL: {atual.get('img')}")
 
     with col_txt:
         # Box da Frase — Centered & Premium (Com Bandeiras e Texto Maior)
