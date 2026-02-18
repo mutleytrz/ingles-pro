@@ -25,6 +25,7 @@ import auth
 import icons
 import admin_panel
 import neural_sleep
+import pronunciation_coach
 
 # -- Inicializa banco de dados --
 database.init_db()
@@ -1151,6 +1152,10 @@ with st.sidebar:
         st.session_state['pagina'] = 'neural_sleep'
         st.rerun()
 
+    if st.button("🎓 Professor de Pronúncia", use_container_width=True):
+        st.session_state['pagina'] = 'pronunciation_coach'
+        st.rerun()
+
     if is_admin:
         st.markdown("---")
         if st.button("🛡️ Painel Admin", use_container_width=True):
@@ -1226,6 +1231,9 @@ def _build_test_questions(banco, midpoint, username):
 # -- ROUTING --
 if st.session_state['pagina'] == 'neural_sleep':
     neural_sleep.render_neural_mode(username)
+
+elif st.session_state['pagina'] == 'pronunciation_coach':
+    pronunciation_coach.render_pronunciation_coach(username)
 
 elif st.session_state['pagina'] == 'admin_panel':
     if not is_admin:
@@ -1316,14 +1324,14 @@ Reconhecimento de voz, feedback em tempo real e algoritmos adaptativos que evolu
 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
 </div>
 <div class="ft-content">
-<div class="ft-title">Síntese de Voz</div>
-<div class="ft-desc">Análise de pronúncia em tempo real com reconhecimento de voz avançado. Ouça, fale e melhore a cada sessão.</div>
+<div class="ft-title">Professor de Pronúncia</div>
+<div class="ft-desc">Treine com um professor AI: ouça a frase, repita e receba correção fonética detalhada em português. Aprenda como se fala de verdade.</div>
 </div>
 <div class="ft-arrow">→</div>
 </div>
 """, unsafe_allow_html=True)
-        if st.button("VER MÉTRICAS", key="btn_card2_home", use_container_width=True):
-            st.session_state['pagina'] = 'metricas'
+        if st.button("🎓 TREINAR AGORA", key="btn_card2_home", use_container_width=True):
+            st.session_state['pagina'] = 'pronunciation_coach'
             salvar_progresso()
             st.rerun()
 
