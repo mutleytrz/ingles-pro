@@ -1282,6 +1282,12 @@ if '_progresso_carregado' not in st.session_state:
 
 is_admin = database.is_user_admin(username)
 
+# -- CARREGAR DADOS DO USUARIO (PREMIUM, ADMIN, etc.) --
+# Recarrega SEMPRE do banco para refletir mudanças feitas pelo admin em tempo real
+# (ex: marcar/desmarcar premium). É um SELECT leve, sem impacto de performance.
+_db_user = database.get_user(username)
+if _db_user:
+    st.session_state['usuario'] = _db_user
 
 # -- NAV BAR --
 _tier_name, _tier_color, _tier_emoji = _get_xp_tier(int(st.session_state['xp']))
@@ -1731,6 +1737,11 @@ elif st.session_state['pagina'] == 'selecao_modulos':
                 if st.button("ACESSAR MÓDULO", key=f"btn_mod_{arquivo}", use_container_width=True, type="primary"):
                     st.session_state['pagina'] = 'aula'
                     st.session_state['arquivo_atual'] = arquivo
+                    # Reseta indice para o progresso salvo DESTE módulo (0 se novo)
+                    _saved = database.load_module_progress(username, arquivo)
+                    st.session_state['indice'] = _saved
+                    st.session_state['porc_atual'] = 0
+                    st.session_state['tentativa'] = 0
                     salvar_progresso()
                     st.rerun()
 
@@ -2007,7 +2018,7 @@ elif st.session_state['pagina'] == 'aula':
             # Botão de Repetir (Texto + Icone) - Visual de Toolbar
             if st.button("🔄 REPETIR", key="btn_retry_top", help="Reiniciar tentativa", use_container_width=True):
                 st.session_state['porc_atual'] = 0
-                st.session_state['tentativa'] = 0
+                st.session_state['tentativa'] = int(st.session_state.get('tentativa', 0)) + 1
                 st.rerun()
 
         if gravacao:
