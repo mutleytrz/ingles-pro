@@ -7,6 +7,12 @@ import database
 import config
 import email_service
 import random
+import time
+import re
+import hmac
+import hashlib
+import json
+import base64
 from typing import Optional
 
 
@@ -133,18 +139,17 @@ def render_register():
 """, unsafe_allow_html=True)
 
     with st.form("register_form"):
-        st.markdown("<div style='display:flex; gap:20px;'>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
-            new_user = st.text_input("👤 Usuário", key="reg_user", placeholder="ex: aluno123")
+            new_user = st.text_input("👤 Usuário", key="reg_user", placeholder="ex: aluno123", help="Use apenas letras, números e sublinhado (_). Não use pontos ou @.")
             new_email = st.text_input("📧 Email", key="reg_email", placeholder="seu@email.com")
         with c2:
             new_name = st.text_input("📛 Nome", key="reg_name", placeholder="Seu nome")
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True) # Espaçamento p/ alinhar com inputs da esquerda
         
         c3, c4 = st.columns(2)
         with c3:
-             new_pass = st.text_input("🔑 Senha", type="password", key="reg_pass", placeholder="••••")
+             new_pass = st.text_input("🔑 Senha", type="password", key="reg_pass", placeholder="••••", help="Mínimo 6 caracteres, deve conter letras e números.")
         with c4:
              new_pass2 = st.text_input("🔑 Confirmar Senha", type="password", key="reg_pass2", placeholder="••••")
         
@@ -164,12 +169,38 @@ def render_register():
             st.error("⚠️ Nome deve ter pelo menos 2 caracteres.")
             return
         new_user = new_user.strip().lower()
+        new_email = new_email.strip().lower()
         new_name = new_name.strip()
+        
+        # 1. VERIFICAÇÃO DE DUPLICIDADE (BLOQUEIO IMEDIATO)
+        # ------------------------------------------------
+        if database.get_user(new_user):
+            st.error(f"❌ O usuário '{new_user}' já está em uso. Escolha outro.")
+            return
+
+        if new_email:
+            try:
+                conn = database._get_conn()
+                # Busca case-insensitive para garantir bloqueio total
+                res = conn.execute("SELECT 1 FROM users WHERE LOWER(email) = ?", (new_email,)).fetchone()
+                conn.close()
+                if res:
+                    st.error(f"❌ O email '{new_email}' já está cadastrado. Tente fazer login.")
+                    return
+            except Exception as e:
+                print(f"[ERR] Erro ao validar email: {e}")
+        # ------------------------------------------------
+
         if new_pass != new_pass2:
             st.error("⚠️ As senhas não coincidem.")
             return
-        if len(new_pass) < 4:
-            st.error("⚠️ A senha deve ter pelo menos 4 caracteres.")
+            
+        # Validacao de senha mista (Letras e Numeros) e tamanho
+        if len(new_pass) < 6:
+            st.error("⚠️ A senha deve ter pelo menos 6 caracteres.")
+            return
+        if not re.search(r"[a-zA-Z]", new_pass) or not re.search(r"[0-9]", new_pass):
+            st.error("⚠️ A senha deve ser mista (conter letras e números).")
             return
 
         hashed = stauth.Hasher().hash(new_pass)
@@ -205,13 +236,7 @@ def render_register():
                 st.error(f"❌ Usuário '{new_user}' já existe.")
 
 
-import hmac
-import hashlib
-import json
-import base64
-import time
-
-# ... (imports existing) ...
+# ... (helper functions) ...
 
 def _get_secret_key():
     """Retorna chave secreta para assinatura."""
